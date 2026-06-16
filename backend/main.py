@@ -109,6 +109,44 @@ def get_risk_message(score: float, district: str) -> str:
     }
     return messages[level]
 
+def calibrate_score(score: float, data: PredictionInput) -> float:
+    multiplier = 1.0
+
+    # Elevation: <5m = high risk, >500m = lower risk
+    if data.elevation_m < 5:
+        multiplier += 0.15
+    elif data.elevation_m > 500:
+        multiplier -= 0.10
+
+    # Rainfall: heavy rain increases risk
+    if data.rainfall_7d_mm > 200:
+        multiplier += 0.12
+    elif data.rainfall_7d_mm < 20:
+        multiplier -= 0.08
+
+    # River proximity
+    if data.distance_to_river_m < 100:
+        multiplier += 0.10
+    elif data.distance_to_river_m > 2000:
+        multiplier -= 0.08
+
+    # Historical floods
+    multiplier += min(data.historical_flood_count * 0.02, 0.15)
+
+    # Drainage
+    multiplier += (0.6 - data.drainage_index) * 0.15
+
+    # Current flood event
+    if data.flood_occurrence_current_event == "Yes":
+        multiplier += 0.10
+
+    # Water presence
+    if data.water_presence_flag == "High":
+        multiplier += 0.08
+
+    calibrated = score * multiplier
+    return float(np.clip(calibrated, 0.0, 1.0))
+
 @app.get("/")
 def root():
     return {
@@ -163,8 +201,12 @@ def predict(data: PredictionInput):
         # Get cat feature indices
         cat_idx = [i for i, c in enumerate(FEATURES) if c in CAT_COLS]
 
-        # Predict
-        score = float(np.clip(model.predict(X)[0], 0.0, 1.0))
+        # Predict (raw model output)
+        raw_score = float(np.clip(model.predict(X)[0], 0.0, 1.0))
+
+        # Apply risk factor calibration
+        score = calibrate_score(raw_score, data)
+
         level = get_risk_level(score)
         color = get_risk_color(score)
         message = get_risk_message(score, data.district)
