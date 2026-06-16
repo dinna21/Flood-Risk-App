@@ -112,33 +112,45 @@ def get_risk_message(score: float, district: str) -> str:
 def calibrate_score(score: float, data: PredictionInput) -> float:
     multiplier = 1.0
 
-    # Elevation: <5m = high risk, >500m = lower risk
-    if data.elevation_m < 5:
-        multiplier += 0.15
+    # Elevation tiers: lower = higher risk
+    if data.elevation_m < 3:
+        multiplier += 0.18
+    elif data.elevation_m < 10:
+        multiplier += 0.10
+    if data.elevation_m > 1000:
+        multiplier -= 0.20
     elif data.elevation_m > 500:
-        multiplier -= 0.10
+        multiplier -= 0.08
 
     # Rainfall: heavy rain increases risk
-    if data.rainfall_7d_mm > 200:
-        multiplier += 0.12
-    elif data.rainfall_7d_mm < 20:
-        multiplier -= 0.08
+    if data.rainfall_7d_mm > 250:
+        multiplier += 0.15
+    elif data.rainfall_7d_mm > 150:
+        multiplier += 0.08
+    if data.rainfall_7d_mm < 15:
+        multiplier -= 0.10
 
     # River proximity
-    if data.distance_to_river_m < 100:
-        multiplier += 0.10
-    elif data.distance_to_river_m > 2000:
-        multiplier -= 0.08
+    if data.distance_to_river_m < 80:
+        multiplier += 0.12
+    elif data.distance_to_river_m < 200:
+        multiplier += 0.06
+    if data.distance_to_river_m > 2500:
+        multiplier -= 0.12
+    elif data.distance_to_river_m > 1000:
+        multiplier -= 0.05
 
     # Historical floods
-    multiplier += min(data.historical_flood_count * 0.02, 0.15)
+    multiplier += min(data.historical_flood_count * 0.025, 0.20)
+    if data.historical_flood_count == 0:
+        multiplier -= 0.06
 
     # Drainage
-    multiplier += (0.6 - data.drainage_index) * 0.15
+    multiplier += (0.5 - data.drainage_index) * 0.20
 
     # Current flood event
     if data.flood_occurrence_current_event == "Yes":
-        multiplier += 0.10
+        multiplier += 0.12
 
     # Water presence
     if data.water_presence_flag == "High":
