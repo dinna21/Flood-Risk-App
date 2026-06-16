@@ -1,5 +1,12 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
+import dynamic from "next/dynamic";
+import MonitoringDashboard from "./components/MonitoringDashboard";
+import BatchUpload from "./components/BatchUpload";
+import AlertSystem from "./components/AlertSystem";
+
+/* Leaflet map must be client-only (no SSR) */
+const FloodRiskMap = dynamic(() => import("./components/Map"), { ssr: false });
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -49,6 +56,72 @@ function getRiskColor(level: string): string {
   }
 }
 
+/* ─── generateExplanation ───────────────────────────────────────── */
+function generateExplanation(
+  formData: Record<string, number | string>,
+  score: number,
+  level: string
+): string {
+  const riskPct = (score * 100).toFixed(1);
+  const data = formData as Record<string, number | string>;
+
+  const rainRisk = (data.rainfall_7d_mm as number) > 100
+    ? "heavy recent rainfall"
+    : (data.rainfall_7d_mm as number) > 50
+    ? "moderate recent rainfall"
+    : "low recent rainfall";
+
+  const riverRisk = (data.distance_to_river_m as number) < 200
+    ? "very close river proximity"
+    : (data.distance_to_river_m as number) < 500
+    ? "moderate river proximity"
+    : "safe river distance";
+
+  const elevRisk = (data.elevation_m as number) < 5
+    ? "very low elevation (high flood exposure)"
+    : (data.elevation_m as number) < 20
+    ? "low elevation"
+    : "safe elevation";
+
+  const drainRisk = (data.drainage_index as number) < 0.3
+    ? "poor drainage capacity"
+    : (data.drainage_index as number) < 0.6
+    ? "moderate drainage"
+    : "good drainage";
+
+  const histRisk = (data.historical_flood_count as number) > 5
+    ? "frequent historical flooding"
+    : (data.historical_flood_count as number) > 2
+    ? "some historical flood events"
+    : "minimal flood history";
+
+  const actions = level === "Very High" ? [
+    "Evacuate immediately if water levels rise",
+    "Contact emergency services: 119",
+    "Move valuables to higher ground",
+    "Follow official evacuation routes"
+  ] : level === "High" ? [
+    "Monitor river and drainage levels closely",
+    "Prepare emergency evacuation plan",
+    "Stock emergency supplies for 3 days",
+    "Register with nearest evacuation center"
+  ] : level === "Moderate" ? [
+    "Monitor weather forecasts daily",
+    "Ensure drainage channels are clear",
+    "Keep emergency contacts ready",
+    `Nearest evacuation center: ${data.nearest_evac_km}km away`
+  ] : [
+    "Continue normal activities",
+    "Stay informed about weather updates",
+    "Maintain drainage systems regularly"
+  ];
+
+  return `This location in ${data.district} shows ${level.toLowerCase()} flood risk at ${riskPct}%. Key factors: ${rainRisk}, ${riverRisk}, ${elevRisk}, and ${drainRisk}. The area has ${histRisk} with ${data.historical_flood_count} recorded flood events. Soil type (${data.soil_type}) and land cover (${data.landcover}) further influence drainage.
+
+Recommended Actions:
+${actions.map((a, i) => `${i+1}. ${a}`).join('\n')}`;
+}
+
 /* ─── useCountUp hook (unchanged) ───────────────────────────────── */
 function useCountUp(target: number, duration = 900): number {
   const [value, setValue] = useState(0);
@@ -57,9 +130,9 @@ function useCountUp(target: number, duration = 900): number {
   useEffect(() => {
     const start = performance.now();
     const tick = (now: number) => {
-      const elapsed = now - start;
+      const elapsed  = now - start;
       const progress = Math.min(elapsed / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3);
+      const eased    = 1 - Math.pow(1 - progress, 3);
       setValue(target * eased);
       if (progress < 1) rafRef.current = requestAnimationFrame(tick);
     };
@@ -70,11 +143,11 @@ function useCountUp(target: number, duration = 900): number {
   return value;
 }
 
-/* ─── Risk Arc SVG (200×200, 8px stroke, animated) ──────────────── */
+/* ─── Risk Arc SVG (unchanged) ──────────────────────────────────── */
 function RiskRing({ score, color }: { score: number; color: string }) {
-  const radius = 88;
+  const radius       = 88;
   const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (score / 100) * circumference;
+  const offset        = circumference - (score / 100) * circumference;
   const animatedScore = useCountUp(score, 800);
 
   return (
@@ -98,6 +171,51 @@ function RiskRing({ score, color }: { score: number; color: string }) {
     </div>
   );
 }
+
+/* ─── Tab definitions ────────────────────────────────────────────── */
+const TABS = [
+  { id: "predict", label: "Predict"    },
+  { id: "map",     label: "Risk Map"   },
+  { id: "batch",   label: "Batch Upload" },
+  { id: "monitor", label: "Monitoring" },
+];
+
+/* ─── District auto-population defaults ─────────────────────────── */
+const DISTRICT_DEFAULTS: Record<string, {
+  elevation: number;
+  rainfall: number;
+  monthly: number;
+  riverDist: number;
+  floodCount: number;
+  drainage: number;
+  floodEvent: string;
+  waterPresence: string;
+}> = {
+  Colombo:      { elevation:10,  rainfall:150, monthly:375, riverDist:200, floodCount:3,  drainage:0.4, floodEvent:"No",  waterPresence:"Medium" },
+  Gampaha:      { elevation:15,  rainfall:160, monthly:400, riverDist:250, floodCount:3,  drainage:0.4, floodEvent:"No",  waterPresence:"Medium" },
+  Kandy:        { elevation:500, rainfall:180, monthly:450, riverDist:400, floodCount:2,  drainage:0.5, floodEvent:"No",  waterPresence:"Low" },
+  Galle:        { elevation:5,   rainfall:220, monthly:550, riverDist:100, floodCount:5,  drainage:0.3, floodEvent:"Yes", waterPresence:"High" },
+  Matara:       { elevation:5,   rainfall:200, monthly:500, riverDist:150, floodCount:4,  drainage:0.3, floodEvent:"Yes", waterPresence:"High" },
+  Hambantota:   { elevation:10,  rainfall:90,  monthly:225, riverDist:500, floodCount:2,  drainage:0.5, floodEvent:"No",  waterPresence:"Low" },
+  Kurunegala:   { elevation:100, rainfall:130, monthly:325, riverDist:600, floodCount:2,  drainage:0.5, floodEvent:"No",  waterPresence:"Medium" },
+  Ratnapura:    { elevation:3,   rainfall:320, monthly:800, riverDist:50,  floodCount:10, drainage:0.1, floodEvent:"Yes", waterPresence:"High" },
+  Kalutara:     { elevation:5,   rainfall:260, monthly:650, riverDist:80,  floodCount:6,  drainage:0.2, floodEvent:"Yes", waterPresence:"High" },
+  Badulla:      { elevation:680, rainfall:160, monthly:400, riverDist:400, floodCount:2,  drainage:0.5, floodEvent:"No",  waterPresence:"Low" },
+  Monaragala:   { elevation:150, rainfall:110, monthly:275, riverDist:700, floodCount:2,  drainage:0.5, floodEvent:"No",  waterPresence:"Medium" },
+  Polonnaruwa:  { elevation:50,  rainfall:90,  monthly:225, riverDist:300, floodCount:3,  drainage:0.4, floodEvent:"No",  waterPresence:"Medium" },
+  Anuradhapura: { elevation:100, rainfall:70,  monthly:175, riverDist:1000,floodCount:1,  drainage:0.6, floodEvent:"No",  waterPresence:"Low" },
+  Trincomalee:  { elevation:10,  rainfall:110, monthly:275, riverDist:400, floodCount:3,  drainage:0.4, floodEvent:"No",  waterPresence:"Medium" },
+  Batticaloa:   { elevation:3,   rainfall:140, monthly:350, riverDist:80,  floodCount:5,  drainage:0.3, floodEvent:"Yes", waterPresence:"High" },
+  Ampara:       { elevation:30,  rainfall:110, monthly:275, riverDist:300, floodCount:3,  drainage:0.4, floodEvent:"No",  waterPresence:"Medium" },
+  Jaffna:       { elevation:5,   rainfall:50,  monthly:125, riverDist:1500,floodCount:1,  drainage:0.5, floodEvent:"No",  waterPresence:"Low" },
+  Kilinochchi:  { elevation:15,  rainfall:55,  monthly:138, riverDist:1200,floodCount:1,  drainage:0.5, floodEvent:"No",  waterPresence:"Low" },
+  Mannar:       { elevation:5,   rainfall:55,  monthly:138, riverDist:1000,floodCount:1,  drainage:0.5, floodEvent:"No",  waterPresence:"Low" },
+  Vavuniya:     { elevation:80,  rainfall:75,  monthly:188, riverDist:800, floodCount:1,  drainage:0.6, floodEvent:"No",  waterPresence:"Low" },
+  "Nuwara Eliya":{ elevation:1800,rainfall:60,  monthly:150, riverDist:3000,floodCount:0,  drainage:0.8, floodEvent:"No",  waterPresence:"Low" },
+  Kegalle:      { elevation:180, rainfall:210, monthly:525, riverDist:250, floodCount:3,  drainage:0.4, floodEvent:"No",  waterPresence:"Medium" },
+  Matale:       { elevation:350, rainfall:140, monthly:350, riverDist:400, floodCount:2,  drainage:0.5, floodEvent:"No",  waterPresence:"Low" },
+  Puttalam:     { elevation:10,  rainfall:65,  monthly:163, riverDist:800, floodCount:1,  drainage:0.5, floodEvent:"No",  waterPresence:"Low" },
+};
 
 /* ─── Main Component ─────────────────────────────────────────────── */
 export default function Home() {
@@ -133,15 +251,12 @@ export default function Home() {
   const [stats, setStats]     = useState<Stats | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState("");
+  const [explanation, setExplanation] = useState("");
+  const [activeTab, setActiveTab] = useState("predict");
 
   useEffect(() => {
     fetchHistory();
     fetchStats();
-    const interval = setInterval(() => {
-      fetchHistory();
-      fetchStats();
-    }, 5000);
-    return () => clearInterval(interval);
   }, []);
 
   /* ── API calls (unchanged) ── */
@@ -149,24 +264,16 @@ export default function Home() {
     try {
       const res  = await fetch(`${API_URL}/history`);
       const data = await res.json();
-      console.log("History:", data);
       setHistory(data.predictions || []);
-    } catch (e) {
-      console.error("History fetch failed:", e);
-      setError("Failed to load history");
-    }
+    } catch (e) { console.error("History fetch failed:", e); }
   };
 
   const fetchStats = async () => {
     try {
       const res  = await fetch(`${API_URL}/stats`);
       const data = await res.json();
-      console.log("Stats:", data);
       setStats(data);
-    } catch (e) {
-      console.error("Stats fetch failed:", e);
-      setError("Failed to load stats");
-    }
+    } catch (e) { console.error("Stats fetch failed:", e); }
   };
 
   const handleSubmit = async () => {
@@ -182,12 +289,9 @@ export default function Home() {
       if (!res.ok) throw new Error("Prediction failed");
       const data = await res.json();
       setResult(data);
+      setExplanation(generateExplanation(form, data.flood_risk_score, data.risk_level));
       fetchHistory();
       fetchStats();
-      setTimeout(() => {
-        fetchHistory();
-        fetchStats();
-      }, 1000);
     } catch (e) {
       setError("Failed to get prediction. Please try again.");
     } finally {
@@ -199,17 +303,34 @@ export default function Home() {
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
     const { name, value } = e.target;
+    if (name === "district" && typeof value === "string") {
+      const defaults = DISTRICT_DEFAULTS[value];
+      if (defaults) {
+        setForm((prev) => ({
+          ...prev,
+          district: value,
+          elevation_m: defaults.elevation,
+          rainfall_7d_mm: defaults.rainfall,
+          monthly_rainfall_mm: defaults.monthly,
+          distance_to_river_m: defaults.riverDist,
+          historical_flood_count: defaults.floodCount,
+          drainage_index: defaults.drainage,
+          flood_occurrence_current_event: defaults.floodEvent,
+          water_presence_flag: defaults.waterPresence,
+        }));
+        return;
+      }
+    }
     setForm((prev) => ({
       ...prev,
       [name]: isNaN(Number(value)) ? value : Number(value),
     }));
   };
 
-  /* ── Derived display values ── */
+  /* ── Derived ── */
   const riskScore = result ? result.flood_risk_score * 100 : 0;
   const riskColor = result ? getRiskColor(result.risk_level) : "var(--accent)";
 
-  /* ── Score color for history items ── */
   const historyScoreColor = (level: string) => {
     switch (level) {
       case "Low":       return "var(--risk-low)";
@@ -220,7 +341,9 @@ export default function Home() {
     }
   };
 
-  /* ── JSX ── */
+  /* ────────────────────────────────────────────────────────────────
+     RENDER
+  ──────────────────────────────────────────────────────────────── */
   return (
     <>
       {/* Animated background orbs */}
@@ -230,379 +353,416 @@ export default function Home() {
       <div className="orb orb-4" aria-hidden="true" />
       <div className="orb orb-5" aria-hidden="true" />
 
-      <div className="page-root">
+      {/* High-risk alert toasts */}
+      <AlertSystem />
 
-        {/* ════════════════ HEADER (52px) ════════════════ */}
-        <header className="header-bar">
+      {/* ── Page shell: full-viewport grid, header + scrollable body ── */}
+      <div style={{
+        position: "relative", zIndex: 1,
+        minHeight: "100vh", display: "flex", flexDirection: "column",
+        background: "var(--void)",
+      }}>
+
+        {/* ════════ HEADER ════════ */}
+        <header className="header-bar" style={{ flexShrink: 0, gridRow: "unset" }}>
           <div className="header-title">
             Sri Lanka <span className="accent">Flood Risk Intelligence</span>
           </div>
-
           <div className="header-stats">
             <div className="stat-chip">
-              <span className="stat-chip-value">
-                {stats ? stats.total_predictions : "—"}
-              </span>
+              <span className="stat-chip-value">{stats ? stats.total_predictions : "—"}</span>
               <span className="stat-chip-label">Total Predictions</span>
             </div>
             <div className="stat-chip">
-              <span className="stat-chip-value">
-                {stats ? (stats.avg_risk_score * 100).toFixed(1) + "%" : "—"}
-              </span>
+              <span className="stat-chip-value">{stats ? (stats.avg_risk_score * 100).toFixed(1) + "%" : "—"}</span>
               <span className="stat-chip-label">Avg Risk Score</span>
             </div>
             <div className="stat-chip">
-              <span className="stat-chip-value">
-                {stats ? stats.high_risk_count : "—"}
-              </span>
+              <span className="stat-chip-value">{stats ? stats.high_risk_count : "—"}</span>
               <span className="stat-chip-label">High Risk Areas</span>
             </div>
           </div>
         </header>
 
-        {/* ════════════════ BODY GRID ════════════════ */}
-        <div className="body-grid">
-
-          {/* ─── LEFT COLUMN — Input Form (400px, no scroll) ─── */}
-          <div className="form-column">
-            <div className="glass-panel form-panel">
-
-              <div className="form-content">
-
-                {/* ── GROUP 1: LOCATION ── */}
-                <div className="form-group-label">Location</div>
-                <div className="form-group">
-                  {/* District — full width */}
-                  <div className="fields-1">
-                    <div className="field-row">
-                      <label className="field-label" htmlFor="district">District</label>
-                      <div className="select-wrapper">
-                        <select
-                          id="district" name="district"
-                          value={form.district}
-                          onChange={handleChange}
-                          className="glass-input"
-                        >
-                          {["Colombo","Gampaha","Kandy","Galle","Matara",
-                            "Hambantota","Kurunegala","Ratnapura","Kalutara",
-                            "Badulla","Monaragala","Polonnaruwa","Anuradhapura",
-                            "Trincomalee","Batticaloa","Ampara","Jaffna",
-                            "Kilinochchi","Mannar","Vavuniya","Nuwara Eliya",
-                            "Kegalle","Matale","Puttalam"].map((d) => (
-                            <option key={d} value={d}>{d}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-                  {/* Latitude / Longitude — 2 col */}
-                  <div className="fields-2">
-                    <div className="field-row">
-                      <label className="field-label" htmlFor="latitude">Latitude</label>
-                      <input id="latitude" type="number" name="latitude"
-                        value={form.latitude} onChange={handleChange}
-                        className="glass-input" step="any" />
-                    </div>
-                    <div className="field-row">
-                      <label className="field-label" htmlFor="longitude">Longitude</label>
-                      <input id="longitude" type="number" name="longitude"
-                        value={form.longitude} onChange={handleChange}
-                        className="glass-input" step="any" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* ── GROUP 2: WEATHER & TERRAIN ── */}
-                <div className="form-group-label">Weather &amp; Terrain</div>
-                <div className="form-group">
-                  {/* 3 col */}
-                  <div className="fields-3">
-                    <div className="field-row">
-                      <label className="field-label" htmlFor="elevation_m">Elevation (m)</label>
-                      <input id="elevation_m" type="number" name="elevation_m"
-                        value={form.elevation_m} onChange={handleChange}
-                        className="glass-input" step="any" />
-                    </div>
-                    <div className="field-row">
-                      <label className="field-label" htmlFor="rainfall_7d_mm">Rain 7d (mm)</label>
-                      <input id="rainfall_7d_mm" type="number" name="rainfall_7d_mm"
-                        value={form.rainfall_7d_mm} onChange={handleChange}
-                        className="glass-input" step="any" />
-                    </div>
-                    <div className="field-row">
-                      <label className="field-label" htmlFor="monthly_rainfall_mm">Monthly (mm)</label>
-                      <input id="monthly_rainfall_mm" type="number" name="monthly_rainfall_mm"
-                        value={form.monthly_rainfall_mm} onChange={handleChange}
-                        className="glass-input" step="any" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* ── GROUP 3: ENVIRONMENT ── */}
-                <div className="form-group-label">Environment</div>
-                <div className="form-group">
-                  {/* River / Evac — 2 col */}
-                  <div className="fields-2">
-                    <div className="field-row">
-                      <label className="field-label" htmlFor="distance_to_river_m">River Dist. (m)</label>
-                      <input id="distance_to_river_m" type="number" name="distance_to_river_m"
-                        value={form.distance_to_river_m} onChange={handleChange}
-                        className="glass-input" step="any" />
-                    </div>
-                    <div className="field-row">
-                      <label className="field-label" htmlFor="nearest_evac_km">Evac. Center (km)</label>
-                      <input id="nearest_evac_km" type="number" name="nearest_evac_km"
-                        value={form.nearest_evac_km} onChange={handleChange}
-                        className="glass-input" step="any" />
-                    </div>
-                  </div>
-                  {/* Land Cover / Soil Type — 2 col */}
-                  <div className="fields-2">
-                    <div className="field-row">
-                      <label className="field-label" htmlFor="landcover">Land Cover</label>
-                      <div className="select-wrapper">
-                        <select id="landcover" name="landcover"
-                          value={form.landcover} onChange={handleChange}
-                          className="glass-input">
-                          {["Urban","Forest","Agriculture","Wetland","Water","Barren"]
-                            .map((o) => <option key={o} value={o}>{o}</option>)}
-                        </select>
-                      </div>
-                    </div>
-                    <div className="field-row">
-                      <label className="field-label" htmlFor="soil_type">Soil Type</label>
-                      <div className="select-wrapper">
-                        <select id="soil_type" name="soil_type"
-                          value={form.soil_type} onChange={handleChange}
-                          className="glass-input">
-                          {["Clay","Sandy","Loam","Silt","Rock"]
-                            .map((o) => <option key={o} value={o}>{o}</option>)}
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* ── GROUP 4: RISK FACTORS ── */}
-                <div className="form-group-label">Risk Factors</div>
-                <div className="form-group">
-                  {/* Road / Water presence — 2 col */}
-                  <div className="fields-2">
-                    <div className="field-row">
-                      <label className="field-label" htmlFor="road_quality">Road Quality</label>
-                      <div className="select-wrapper">
-                        <select id="road_quality" name="road_quality"
-                          value={form.road_quality} onChange={handleChange}
-                          className="glass-input">
-                          {["Paved","Gravel","Dirt","None"]
-                            .map((o) => <option key={o} value={o}>{o}</option>)}
-                        </select>
-                      </div>
-                    </div>
-                    <div className="field-row">
-                      <label className="field-label" htmlFor="water_presence_flag">Water Presence</label>
-                      <div className="select-wrapper">
-                        <select id="water_presence_flag" name="water_presence_flag"
-                          value={form.water_presence_flag} onChange={handleChange}
-                          className="glass-input">
-                          {["Low","Medium","High"]
-                            .map((o) => <option key={o} value={o}>{o}</option>)}
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-                  {/* Flood event / Urban-Rural — 2 col */}
-                  <div className="fields-2">
-                    <div className="field-row">
-                      <label className="field-label" htmlFor="flood_occurrence_current_event">Current Flood Event</label>
-                      <div className="select-wrapper">
-                        <select id="flood_occurrence_current_event" name="flood_occurrence_current_event"
-                          value={form.flood_occurrence_current_event} onChange={handleChange}
-                          className="glass-input">
-                          {["Yes","No"].map((o) => <option key={o} value={o}>{o}</option>)}
-                        </select>
-                      </div>
-                    </div>
-                    <div className="field-row">
-                      <label className="field-label" htmlFor="urban_rural">Urban / Rural</label>
-                      <div className="select-wrapper">
-                        <select id="urban_rural" name="urban_rural"
-                          value={form.urban_rural} onChange={handleChange}
-                          className="glass-input">
-                          {["Urban","Rural"].map((o) => <option key={o} value={o}>{o}</option>)}
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-                  {/* Flood count / Drainage / Infra — 3 col */}
-                  <div className="fields-3">
-                    <div className="field-row">
-                      <label className="field-label" htmlFor="historical_flood_count">Flood Count</label>
-                      <input id="historical_flood_count" type="number" name="historical_flood_count"
-                        value={form.historical_flood_count} onChange={handleChange}
-                        className="glass-input" step="1" />
-                    </div>
-                    <div className="field-row">
-                      <label className="field-label" htmlFor="drainage_index">Drainage (0–1)</label>
-                      <input id="drainage_index" type="number" name="drainage_index"
-                        value={form.drainage_index} onChange={handleChange}
-                        className="glass-input" step="0.01" />
-                    </div>
-                    <div className="field-row">
-                      <label className="field-label" htmlFor="infrastructure_score">Infra. Score</label>
-                      <input id="infrastructure_score" type="number" name="infrastructure_score"
-                        value={form.infrastructure_score} onChange={handleChange}
-                        className="glass-input" step="0.01" />
-                    </div>
-                  </div>
-                  {/* Hospital / NDVI — 2 col */}
-                  <div className="fields-2">
-                    <div className="field-row">
-                      <label className="field-label" htmlFor="nearest_hospital_km">Hospital (km)</label>
-                      <input id="nearest_hospital_km" type="number" name="nearest_hospital_km"
-                        value={form.nearest_hospital_km} onChange={handleChange}
-                        className="glass-input" step="any" />
-                    </div>
-                    <div className="field-row">
-                      <label className="field-label" htmlFor="ndvi">NDVI</label>
-                      <input id="ndvi" type="number" name="ndvi"
-                        value={form.ndvi} onChange={handleChange}
-                        className="glass-input" step="0.01" />
-                    </div>
-                  </div>
-                </div>
-
-              </div>{/* end form-content */}
-
-              {/* Predict button — margin-top: auto pushes to bottom */}
+        {/* ════════ TAB BAR ════════ */}
+        <nav style={{
+          display: "flex", gap: 2, padding: "0 24px",
+          background: "rgba(4,20,36,0.70)",
+          borderBottom: "1px solid var(--glass-border)",
+          backdropFilter: "blur(16px)",
+          WebkitBackdropFilter: "blur(16px)",
+          flexShrink: 0, zIndex: 9,
+        }}>
+          {TABS.map((tab) => {
+            const active = activeTab === tab.id;
+            return (
               <button
-                id="predict-btn"
-                onClick={handleSubmit}
-                disabled={loading}
-                className={`predict-btn${loading ? " loading" : ""}`}
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                style={{
+                  padding: "12px 18px",
+                  fontFamily: "'Space Grotesk',sans-serif",
+                  fontSize: 13, fontWeight: 600,
+                  letterSpacing: "0.04em",
+                  color: active ? "var(--accent)" : "var(--text-muted)",
+                  background: "none", border: "none",
+                  borderBottom: active ? "2px solid var(--accent)" : "2px solid transparent",
+                  cursor: "pointer",
+                  transition: "color 200ms ease, border-color 200ms ease",
+                  whiteSpace: "nowrap",
+                }}
               >
-                {loading ? "Analyzing Risk..." : "Predict Flood Risk"}
+                {tab.label}
               </button>
+            );
+          })}
+        </nav>
 
-              {error && (
-                <div className="error-msg" role="alert">{error}</div>
-              )}
+        {/* ════════ TAB CONTENT ════════ */}
+        <main style={{ flex: 1, overflowY: "auto", padding: 16 }}>
 
-            </div>
-          </div>
+          {/* ── PREDICT TAB ── */}
+          {activeTab === "predict" && (
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "400px 1fr",
+              gap: 16,
+              maxWidth: 1280,
+              margin: "0 auto",
+            }}>
 
-          {/* ─── RIGHT COLUMN ─── */}
-          <div className="right-column">
+              {/* Form panel */}
+              <div className="glass-panel form-panel" style={{ height: "fit-content" }}>
+                <div className="form-content">
 
-            {/* ── PREDICTION RESULT PANEL ── */}
-            <div className="glass-panel result-panel">
-              <div className="result-title">Prediction Result</div>
-
-              {/* Empty state */}
-              {!result && !loading && (
-                <div className="result-empty">
-                  <svg width="52" height="52" viewBox="0 0 52 52" fill="none" aria-hidden="true">
-                    <circle cx="26" cy="26" r="25" stroke="var(--glass-border)" strokeWidth="1.5"/>
-                    <path
-                      d="M26 12 C26 12 18 22 18 28 C18 32.4 21.6 36 26 36 C30.4 36 34 32.4 34 28 C34 22 26 12 26 12Z"
-                      fill="none" stroke="var(--text-muted)"
-                      strokeWidth="1.5" strokeLinejoin="round"
-                    />
-                  </svg>
-                  <p className="result-empty-text">
-                    Fill in the location details and click Predict to assess flood risk
-                  </p>
-                </div>
-              )}
-
-              {/* Loading state */}
-              {loading && (
-                <div className="result-empty">
-                  <div className="loading-ring" />
-                  <p className="result-empty-text">Analyzing flood risk...</p>
-                </div>
-              )}
-
-              {/* Result — grid: 200px arc | details */}
-              {result && !loading && (
-                <div className="result-content" key={result.timestamp}>
-
-                  {/* Left: Arc + animated score */}
-                  <RiskRing score={riskScore} color={riskColor} />
-
-                  {/* Right: badge + message + meta */}
-                  <div className="risk-details">
-                    <div className={`risk-badge ${getRiskClass(result.risk_level)}`}>
-                      {result.risk_level} Risk
+                  {/* GROUP 1 — LOCATION */}
+                  <div className="form-group-label">Location</div>
+                  <div className="form-group">
+                    <div className="fields-1">
+                      <div className="field-row">
+                        <label className="field-label" htmlFor="district">District</label>
+                        <div className="select-wrapper">
+                          <select id="district" name="district" value={form.district}
+                            onChange={handleChange} className="glass-input">
+                            {["Colombo","Gampaha","Kandy","Galle","Matara",
+                              "Hambantota","Kurunegala","Ratnapura","Kalutara",
+                              "Badulla","Monaragala","Polonnaruwa","Anuradhapura",
+                              "Trincomalee","Batticaloa","Ampara","Jaffna",
+                              "Kilinochchi","Mannar","Vavuniya","Nuwara Eliya",
+                              "Kegalle","Matale","Puttalam"].map((d) => (
+                              <option key={d} value={d}>{d}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
                     </div>
-
-                    <p className="risk-message">{result.message}</p>
-
-                    <div className="risk-meta">
-                      <div className="risk-meta-item">
-                        <span className="risk-meta-label">District</span>
-                        <span className="risk-meta-value">{result.district}</span>
+                    <div className="fields-2">
+                      <div className="field-row">
+                        <label className="field-label" htmlFor="latitude">Latitude</label>
+                        <input id="latitude" type="number" name="latitude"
+                          value={form.latitude} onChange={handleChange}
+                          className="glass-input" step="any" />
                       </div>
-                      <div className="risk-meta-item">
-                        <span className="risk-meta-label">Time</span>
-                        <span className="risk-meta-value">
-                          {new Date(result.timestamp).toLocaleTimeString()}
-                        </span>
-                      </div>
-                      <div className="risk-meta-item">
-                        <span className="risk-meta-label">Score</span>
-                        <span className="risk-meta-value" style={{ color: riskColor }}>
-                          {(result.flood_risk_score * 100).toFixed(2)}%
-                        </span>
+                      <div className="field-row">
+                        <label className="field-label" htmlFor="longitude">Longitude</label>
+                        <input id="longitude" type="number" name="longitude"
+                          value={form.longitude} onChange={handleChange}
+                          className="glass-input" step="any" />
                       </div>
                     </div>
                   </div>
 
-                </div>
-              )}
-            </div>
+                  {/* GROUP 2 — WEATHER & TERRAIN */}
+                  <div className="form-group-label">Weather &amp; Terrain</div>
+                  <div className="form-group">
+                    <div className="fields-3">
+                      <div className="field-row">
+                        <label className="field-label" htmlFor="elevation_m">Elevation (m)</label>
+                        <input id="elevation_m" type="number" name="elevation_m"
+                          value={form.elevation_m} onChange={handleChange}
+                          className="glass-input" step="any" />
+                      </div>
+                      <div className="field-row">
+                        <label className="field-label" htmlFor="rainfall_7d_mm">Rain 7d (mm)</label>
+                        <input id="rainfall_7d_mm" type="number" name="rainfall_7d_mm"
+                          value={form.rainfall_7d_mm} onChange={handleChange}
+                          className="glass-input" step="any" />
+                      </div>
+                      <div className="field-row">
+                        <label className="field-label" htmlFor="monthly_rainfall_mm">Monthly (mm)</label>
+                        <input id="monthly_rainfall_mm" type="number" name="monthly_rainfall_mm"
+                          value={form.monthly_rainfall_mm} onChange={handleChange}
+                          className="glass-input" step="any" />
+                      </div>
+                    </div>
+                  </div>
 
-            {/* ── RECENT PREDICTIONS PANEL ── */}
-            <div className="glass-panel history-panel">
-              <div className="history-title">
-                Recent Predictions
+                  {/* GROUP 3 — ENVIRONMENT */}
+                  <div className="form-group-label">Environment</div>
+                  <div className="form-group">
+                    <div className="fields-2">
+                      <div className="field-row">
+                        <label className="field-label" htmlFor="distance_to_river_m">River Dist. (m)</label>
+                        <input id="distance_to_river_m" type="number" name="distance_to_river_m"
+                          value={form.distance_to_river_m} onChange={handleChange}
+                          className="glass-input" step="any" />
+                      </div>
+                      <div className="field-row">
+                        <label className="field-label" htmlFor="nearest_evac_km">Evac. Center (km)</label>
+                        <input id="nearest_evac_km" type="number" name="nearest_evac_km"
+                          value={form.nearest_evac_km} onChange={handleChange}
+                          className="glass-input" step="any" />
+                      </div>
+                    </div>
+                    <div className="fields-2">
+                      <div className="field-row">
+                        <label className="field-label" htmlFor="landcover">Land Cover</label>
+                        <div className="select-wrapper">
+                          <select id="landcover" name="landcover" value={form.landcover}
+                            onChange={handleChange} className="glass-input">
+                            {["Urban","Forest","Agriculture","Wetland","Water","Barren"]
+                              .map((o) => <option key={o} value={o}>{o}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                      <div className="field-row">
+                        <label className="field-label" htmlFor="soil_type">Soil Type</label>
+                        <div className="select-wrapper">
+                          <select id="soil_type" name="soil_type" value={form.soil_type}
+                            onChange={handleChange} className="glass-input">
+                            {["Clay","Sandy","Loam","Silt","Rock"]
+                              .map((o) => <option key={o} value={o}>{o}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* GROUP 4 — RISK FACTORS */}
+                  <div className="form-group-label">Risk Factors</div>
+                  <div className="form-group">
+                    <div className="fields-2">
+                      <div className="field-row">
+                        <label className="field-label" htmlFor="road_quality">Road Quality</label>
+                        <div className="select-wrapper">
+                          <select id="road_quality" name="road_quality" value={form.road_quality}
+                            onChange={handleChange} className="glass-input">
+                            {["Paved","Gravel","Dirt","None"].map((o) => <option key={o} value={o}>{o}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                      <div className="field-row">
+                        <label className="field-label" htmlFor="water_presence_flag">Water Presence</label>
+                        <div className="select-wrapper">
+                          <select id="water_presence_flag" name="water_presence_flag" value={form.water_presence_flag}
+                            onChange={handleChange} className="glass-input">
+                            {["Low","Medium","High"].map((o) => <option key={o} value={o}>{o}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="fields-2">
+                      <div className="field-row">
+                        <label className="field-label" htmlFor="flood_occurrence_current_event">Current Flood Event</label>
+                        <div className="select-wrapper">
+                          <select id="flood_occurrence_current_event" name="flood_occurrence_current_event"
+                            value={form.flood_occurrence_current_event}
+                            onChange={handleChange} className="glass-input">
+                            {["Yes","No"].map((o) => <option key={o} value={o}>{o}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                      <div className="field-row">
+                        <label className="field-label" htmlFor="urban_rural">Urban / Rural</label>
+                        <div className="select-wrapper">
+                          <select id="urban_rural" name="urban_rural" value={form.urban_rural}
+                            onChange={handleChange} className="glass-input">
+                            {["Urban","Rural"].map((o) => <option key={o} value={o}>{o}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="fields-3">
+                      <div className="field-row">
+                        <label className="field-label" htmlFor="historical_flood_count">Flood Count</label>
+                        <input id="historical_flood_count" type="number" name="historical_flood_count"
+                          value={form.historical_flood_count} onChange={handleChange}
+                          className="glass-input" step="1" />
+                      </div>
+                      <div className="field-row">
+                        <label className="field-label" htmlFor="drainage_index">Drainage (0–1)</label>
+                        <input id="drainage_index" type="number" name="drainage_index"
+                          value={form.drainage_index} onChange={handleChange}
+                          className="glass-input" step="0.01" />
+                      </div>
+                      <div className="field-row">
+                        <label className="field-label" htmlFor="infrastructure_score">Infra. Score</label>
+                        <input id="infrastructure_score" type="number" name="infrastructure_score"
+                          value={form.infrastructure_score} onChange={handleChange}
+                          className="glass-input" step="0.01" />
+                      </div>
+                    </div>
+                    <div className="fields-2">
+                      <div className="field-row">
+                        <label className="field-label" htmlFor="nearest_hospital_km">Hospital (km)</label>
+                        <input id="nearest_hospital_km" type="number" name="nearest_hospital_km"
+                          value={form.nearest_hospital_km} onChange={handleChange}
+                          className="glass-input" step="any" />
+                      </div>
+                      <div className="field-row">
+                        <label className="field-label" htmlFor="ndvi">NDVI</label>
+                        <input id="ndvi" type="number" name="ndvi"
+                          value={form.ndvi} onChange={handleChange}
+                          className="glass-input" step="0.01" />
+                      </div>
+                    </div>
+                  </div>
+                </div>{/* end form-content */}
+
                 <button
-                  onClick={() => { fetchHistory(); fetchStats(); }}
-                  className="refresh-btn"
-                  title="Refresh history"
+                  id="predict-btn"
+                  onClick={handleSubmit}
+                  disabled={loading}
+                  className={`predict-btn${loading ? " loading" : ""}`}
                 >
-                  ↻
+                  {loading ? "Analyzing Risk..." : "Predict Flood Risk"}
                 </button>
+                {error && <div className="error-msg" role="alert">{error}</div>}
               </div>
 
-              {history.length === 0 ? (
-                <div className="history-empty">No predictions recorded yet</div>
-              ) : (
-                <div className="history-list">
-                  {history.slice(0, 10).map((item) => (
-                    <div className="history-item" key={item.id}>
-                      <span className="history-district">{item.district}</span>
-                      <span
-                        className="history-score"
-                        style={{ color: historyScoreColor(item.risk_level) }}
-                      >
-                        {(item.flood_risk_score * 100).toFixed(1)}%
-                      </span>
-                      <span className={`history-badge ${getRiskClass(item.risk_level)}`}>
-                        {item.risk_level}
-                      </span>
-                      <span className="history-time">
-                        {new Date(item.created_at).toLocaleTimeString()}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+              {/* Results column */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
-          </div>{/* end right-column */}
-        </div>{/* end body-grid */}
-      </div>{/* end page-root */}
+                {/* Prediction result */}
+                <div className="glass-panel result-panel">
+                  <div className="result-title">Prediction Result</div>
+
+                  {!result && !loading && (
+                    <div className="result-empty">
+                      <svg width="52" height="52" viewBox="0 0 52 52" fill="none" aria-hidden="true">
+                        <circle cx="26" cy="26" r="25" stroke="var(--glass-border)" strokeWidth="1.5"/>
+                        <path d="M26 12 C26 12 18 22 18 28 C18 32.4 21.6 36 26 36 C30.4 36 34 32.4 34 28 C34 22 26 12 26 12Z"
+                          fill="none" stroke="var(--text-muted)" strokeWidth="1.5" strokeLinejoin="round"/>
+                      </svg>
+                      <p className="result-empty-text">
+                        Fill in the location details and click Predict to assess flood risk
+                      </p>
+                    </div>
+                  )}
+
+                  {loading && (
+                    <div className="result-empty">
+                      <div className="loading-ring" />
+                      <p className="result-empty-text">Analyzing flood risk...</p>
+                    </div>
+                  )}
+
+                  {result && !loading && (
+                    <div className="result-content" key={result.timestamp}>
+                      <RiskRing score={riskScore} color={riskColor} />
+                      <div className="risk-details">
+                        <div className={`risk-badge ${getRiskClass(result.risk_level)}`}>
+                          {result.risk_level} Risk
+                        </div>
+                        <p className="risk-message">{result.message}</p>
+                        <div className="risk-meta">
+                          <div className="risk-meta-item">
+                            <span className="risk-meta-label">District</span>
+                            <span className="risk-meta-value">{result.district}</span>
+                          </div>
+                          <div className="risk-meta-item">
+                            <span className="risk-meta-label">Time</span>
+                            <span className="risk-meta-value">{new Date(result.timestamp).toLocaleTimeString()}</span>
+                          </div>
+                          <div className="risk-meta-item">
+                            <span className="risk-meta-label">Score</span>
+                            <span className="risk-meta-value" style={{ color: riskColor }}>
+                              {(result.flood_risk_score * 100).toFixed(2)}%
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* AI Risk Analysis */}
+                {result && !loading && explanation && (
+                  <div className="glass-panel result-panel" style={{ marginTop: 16 }}>
+                    <div className="result-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontSize: 22 }}>🤖</span>
+                      AI Risk Analysis
+                    </div>
+                    <p style={{
+                      color: "var(--text-secondary)", fontSize: 13,
+                      lineHeight: 1.7, marginTop: 12, whiteSpace: "pre-line",
+                    }}>
+                      {explanation}
+                    </p>
+                  </div>
+                )}
+
+                {/* Recent predictions */}
+                <div className="glass-panel history-panel" style={{ maxHeight: 320 }}>
+                  <div className="history-title">Recent Predictions</div>
+                  {history.length === 0 ? (
+                    <div className="history-empty">No predictions recorded yet</div>
+                  ) : (
+                    <div className="history-list">
+                      {history.slice(0, 10).map((item) => (
+                        <div className="history-item" key={item.id}>
+                          <span className="history-district">{item.district}</span>
+                          <span className="history-score" style={{ color: historyScoreColor(item.risk_level) }}>
+                            {(item.flood_risk_score * 100).toFixed(1)}%
+                          </span>
+                          <span className={`history-badge ${getRiskClass(item.risk_level)}`}>
+                            {item.risk_level}
+                          </span>
+                          <span className="history-time">
+                            {new Date(item.created_at).toLocaleTimeString()}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+              </div>
+            </div>
+          )}
+
+          {/* ── MAP TAB ── */}
+          {activeTab === "map" && (
+            <div style={{ maxWidth: 1280, margin: "0 auto" }}>
+              <FloodRiskMap />
+            </div>
+          )}
+
+          {/* ── BATCH TAB ── */}
+          {activeTab === "batch" && (
+            <div style={{ maxWidth: 900, margin: "0 auto" }}>
+              <BatchUpload />
+            </div>
+          )}
+
+          {/* ── MONITORING TAB ── */}
+          {activeTab === "monitor" && (
+            <div style={{ maxWidth: 1280, margin: "0 auto" }}>
+              <MonitoringDashboard />
+            </div>
+          )}
+
+        </main>
+
+        {/* Footer */}
+        <footer style={{
+          textAlign: "center", padding: "12px 0",
+          fontFamily: "'Inter',sans-serif", fontSize: 11, color: "var(--text-muted)",
+          borderTop: "1px solid var(--glass-border)", flexShrink: 0,
+        }}>
+          ML Opsidian Genesis — TensorTitans_mlops — IEEE Student Branch UCSC
+        </footer>
+      </div>
     </>
   );
 }
