@@ -2,7 +2,6 @@
 import { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import MonitoringDashboard from "./components/MonitoringDashboard";
-import BatchUpload from "./components/BatchUpload";
 import AlertSystem from "./components/AlertSystem";
 
 /* Leaflet map must be client-only (no SSR) */
@@ -176,7 +175,6 @@ function RiskRing({ score, color }: { score: number; color: string }) {
 const TABS = [
   { id: "predict", label: "Predict"    },
   { id: "map",     label: "Risk Map"   },
-  { id: "batch",   label: "Batch Upload" },
   { id: "monitor", label: "Monitoring" },
 ];
 
@@ -368,19 +366,32 @@ export default function Home() {
           <div className="header-title">
             Sri Lanka <span className="accent">Flood Risk Intelligence</span>
           </div>
-          <div className="header-stats">
-            <div className="stat-chip">
-              <span className="stat-chip-value">{stats ? stats.total_predictions : "—"}</span>
-              <span className="stat-chip-label">Total Predictions</span>
-            </div>
-            <div className="stat-chip">
-              <span className="stat-chip-value">{stats ? (stats.avg_risk_score * 100).toFixed(1) + "%" : "—"}</span>
-              <span className="stat-chip-label">Avg Risk Score</span>
-            </div>
-            <div className="stat-chip">
-              <span className="stat-chip-value">{stats ? stats.high_risk_count : "—"}</span>
-              <span className="stat-chip-label">High Risk Areas</span>
-            </div>
+          <div className="header-stats" style={{ display: undefined }}>
+            {stats ? (
+              <div className="hidden sm:flex gap-6">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-blue-400">{stats.total_predictions}</div>
+                  <div className="text-slate-400 text-xs">Predictions</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-yellow-400">{(stats.avg_risk_score * 100).toFixed(1)}%</div>
+                  <div className="text-slate-400 text-xs">Avg Risk</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-red-400">{stats.high_risk_count}</div>
+                  <div className="text-slate-400 text-xs">High Risk</div>
+                </div>
+              </div>
+            ) : (
+              <div className="hidden sm:flex gap-6">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="text-center animate-pulse">
+                    <div className="h-8 w-12 bg-slate-700 rounded mb-1 mx-auto"></div>
+                    <div className="h-3 w-16 bg-slate-700 rounded"></div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </header>
 
@@ -392,6 +403,7 @@ export default function Home() {
           backdropFilter: "blur(16px)",
           WebkitBackdropFilter: "blur(16px)",
           flexShrink: 0, zIndex: 9,
+          overflowX: "auto",
         }}>
           {TABS.map((tab) => {
             const active = activeTab === tab.id;
@@ -735,13 +747,6 @@ export default function Home() {
           {activeTab === "map" && (
             <div style={{ maxWidth: 1280, margin: "0 auto" }}>
               <FloodRiskMap />
-            </div>
-          )}
-
-          {/* ── BATCH TAB ── */}
-          {activeTab === "batch" && (
-            <div style={{ maxWidth: 900, margin: "0 auto" }}>
-              <BatchUpload />
             </div>
           )}
 

@@ -736,3 +736,40 @@ select.glass-input {
   flex-shrink: 0;
   text-transform: uppercase;
 }
+
+/* ─── Global improvements ─────────────────────────────────────────── */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  overflow-x: hidden;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1e293b;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 3px;
+}
+
+* {
+  transition-property: background-color, border-color, color, opacity;
+  transition-duration: 150ms;
+}
+
+.risk-score-value {
+  font-size: 48px;
+}
+
+@media (min-width: 640px) {
+  .risk-score-value {
+    font-size: 72px;
+  }
+}

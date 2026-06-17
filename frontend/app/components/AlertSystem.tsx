@@ -12,18 +12,19 @@ interface Alert {
 }
 
 export default function AlertSystem() {
-  const [alerts, setAlerts]       = useState<Alert[]>([]);
+  const [alerts, setAlerts] = useState<Alert[]>([]);
   const [dismissed, setDismissed] = useState<number[]>([]);
+  const [visible, setVisible] = useState(true);
 
   useEffect(() => {
     fetchAlerts();
-    const interval = setInterval(fetchAlerts, 10000);
+    const interval = setInterval(fetchAlerts, 15000);
     return () => clearInterval(interval);
   }, []);
 
   const fetchAlerts = async () => {
     try {
-      const res  = await fetch(`${API_URL}/history`);
+      const res = await fetch(`${API_URL}/history`);
       const data = await res.json();
       const highRisk = (data.predictions || []).filter(
         (p: Alert) => p.flood_risk_score >= 0.5
@@ -34,53 +35,86 @@ export default function AlertSystem() {
     }
   };
 
-  const visibleAlerts = alerts.filter((a) => !dismissed.includes(a.id));
-  if (visibleAlerts.length === 0) return null;
+  const visibleAlerts = alerts.filter(
+    (a) => !dismissed.includes(a.id)
+  );
+
+  if (visibleAlerts.length === 0 || !visible) return null;
+
+  const getAlertColor = (score: number) => {
+    if (score >= 0.7) return {
+      bg: "bg-red-950",
+      border: "border-red-500",
+      badge: "bg-red-500",
+      text: "text-red-300",
+      icon: "\uD83D\uDD34"
+    };
+    return {
+      bg: "bg-orange-950",
+      border: "border-orange-500",
+      badge: "bg-orange-500",
+      text: "text-orange-300",
+      icon: "\uD83D\uDFE0"
+    };
+  };
 
   return (
-    <div style={{
-      position: "fixed", top: 16, right: 16,
-      zIndex: 9999, display: "flex", flexDirection: "column", gap: 8, maxWidth: 340,
-    }}>
-      {visibleAlerts.slice(0, 3).map((alert) => (
-        <div
-          key={alert.id}
-          style={{
-            background: "rgba(30, 5, 5, 0.88)",
-            border: "1px solid var(--risk-high)",
-            borderRadius: 16,
-            padding: "14px 16px",
-            backdropFilter: "blur(24px) saturate(180%)",
-            WebkitBackdropFilter: "blur(24px) saturate(180%)",
-            boxShadow: "0 0 0 1px rgba(255,61,0,0.25), 0 8px 32px rgba(2,11,24,0.7)",
-            display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12,
-            animation: "slideInTop 300ms ease forwards",
-          }}
+    <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 max-w-xs w-full">
+      <div className="flex justify-end">
+        <button
+          onClick={() => setVisible(false)}
+          className="text-xs text-slate-400 hover:text-white bg-slate-800 px-2 py-1 rounded-lg"
         >
-          <div>
-            <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--risk-high)", marginBottom: 4 }}>
-              High Risk Alert
-            </div>
-            <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 14, fontWeight: 600, color: "var(--text-primary)", marginBottom: 3 }}>
-              {alert.district}
-            </div>
-            <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 12, color: "var(--risk-high)" }}>
-              {(alert.flood_risk_score * 100).toFixed(1)}% — {alert.risk_level}
+          Hide Alerts
+        </button>
+      </div>
+
+      {visibleAlerts.slice(0, 3).map((alert) => {
+        const colors = getAlertColor(alert.flood_risk_score);
+        return (
+          <div key={alert.id}
+            className={`${colors.bg} ${colors.border} border rounded-xl p-3 shadow-2xl backdrop-blur-sm`}
+          >
+            <div className="flex justify-between items-start gap-2">
+              <div className="flex gap-2 items-start">
+                <span className="text-lg mt-0.5">
+                  {colors.icon}
+                </span>
+                <div>
+                  <div className={`text-xs font-bold uppercase tracking-wider ${colors.text} mb-0.5`}>
+                    {"\u26A0\uFE0F"} Flood Risk Alert
+                  </div>
+                  <div className="text-white font-bold text-sm">
+                    {alert.district}
+                  </div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className={`text-xs text-white px-2 py-0.5 rounded-full ${colors.badge}`}>
+                      {alert.risk_level}
+                    </span>
+                    <span className={`text-xs ${colors.text}`}>
+                      {(alert.flood_risk_score * 100).toFixed(1)}%
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => setDismissed(
+                  prev => [...prev, alert.id]
+                )}
+                className="text-slate-400 hover:text-white text-xl leading-none shrink-0"
+              >
+                {"\u00D7"}
+              </button>
             </div>
           </div>
-          <button
-            onClick={() => setDismissed((prev) => [...prev, alert.id])}
-            style={{
-              background: "none", border: "none", color: "var(--text-muted)",
-              cursor: "pointer", fontSize: 18, lineHeight: 1, padding: "0 2px",
-              flexShrink: 0,
-            }}
-            aria-label="Dismiss alert"
-          >
-            ×
-          </button>
+        );
+      })}
+
+      {visibleAlerts.length > 3 && (
+        <div className="text-center text-xs text-slate-400 bg-slate-800 rounded-lg py-1">
+          +{visibleAlerts.length - 3} more alerts
         </div>
-      ))}
+      )}
     </div>
   );
 }
