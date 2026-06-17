@@ -447,18 +447,18 @@ select.glass-input {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 14px;
-  padding: 32px 0;
+  gap: 12px;
+  padding: 20px 0;
 }
 
 .result-empty-text {
   font-family: "Inter", sans-serif;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 400;
   color: var(--text-muted);
   text-align: center;
-  max-width: 260px;
-  line-height: 1.5;
+  max-width: 240px;
+  line-height: 1.4;
 }
 
 /* Loading ring */
@@ -771,5 +771,27 @@ body {
 @media (min-width: 640px) {
   .risk-score-value {
     font-size: 72px;
+  }
+}
+
+/* ─── Toast Animations ───────────────────────────────────────────── */
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes toastOut {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+.toast-enter {
+  animation: toastIn 0.3s ease forwards;
+}
+
+/* ─── Predict tab responsive ─────────────────────────────────────── */
+@media (max-width: 768px) {
+  .body-grid {
+    grid-template-columns: 1fr;
   }
 }

@@ -16,6 +16,10 @@ interface Prediction {
   risk_level: string;
 }
 
+const tooltipStyle = {
+  contentStyle: { backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: "8px", fontSize: 12 },
+};
+
 export default function MonitoringDashboard() {
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,15 +58,10 @@ export default function MonitoringDashboard() {
     { name: "Very High", value: riskCounts["Very High"], color: "#7f1d1d" },
   ].filter(d => d.value > 0);
 
-  const timelineData = predictions
-    .slice()
-    .reverse()
-    .slice(-20)
-    .map((p) => ({
-      index: predictions.length,
-      score: parseFloat((p.flood_risk_score * 100).toFixed(1)),
-      time: new Date(p.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-    }));
+  const timelineData = predictions.slice().reverse().slice(-20).map((p) => ({
+    score: parseFloat((p.flood_risk_score * 100).toFixed(1)),
+    time: new Date(p.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+  }));
 
   const districtData = Object.entries(
     predictions.reduce((acc, p) => {
@@ -85,89 +84,116 @@ export default function MonitoringDashboard() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="text-4xl mb-3 animate-spin">{"\u2699\uFE0F"}</div>
-          <p className="text-slate-400">Loading monitoring data...</p>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 256 }}>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: "2rem", marginBottom: 12, animation: "spin 1s linear infinite" }}>{"\u2699\uFE0F"}</div>
+          <p style={{ color: "#94a3b8", fontFamily: "'Inter',sans-serif", fontSize: 13 }}>Loading monitoring data...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="bg-slate-800 rounded-xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+    <div className="space-y-4" style={{ paddingBottom: 8 }}>
+      {/* Header */}
+      <div style={{
+        background: "var(--glass)", border: "1px solid var(--glass-border)", borderRadius: 16,
+        padding: "14px 20px", display: "flex", flexWrap: "wrap", justifyContent: "space-between",
+        alignItems: "center", gap: 12, backdropFilter: "blur(24px) saturate(180%)",
+      }}>
         <div>
-          <h2 className="text-xl font-bold text-blue-300">{"\uD83D\uDCCA"} Model Monitoring Dashboard</h2>
-          <p className="text-slate-400 text-sm mt-1">Real-time prediction analytics and model performance tracking</p>
+          <h2 style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 16, fontWeight: 600, color: "var(--text-primary)", letterSpacing: "-0.02em" }}>
+            {"\uD83D\uDCCA"} Model Monitoring Dashboard
+          </h2>
+          <p style={{ color: "var(--text-muted)", fontSize: 11, marginTop: 2 }}>Real-time prediction analytics</p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-            <span className="text-green-400 text-sm">Live</span>
-          </div>
-          <span className="text-slate-500 text-xs">Updated: {lastUpdate}</span>
-          <button onClick={fetchData} className="bg-slate-700 hover:bg-slate-600 text-white text-xs px-3 py-1.5 rounded-lg">
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e", display: "inline-block", boxShadow: "0 0 6px #22c55e" }} />
+          <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: "#22c55e" }}>Live</span>
+          <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: "var(--text-muted)" }}>{lastUpdate}</span>
+          <button
+            onClick={fetchData}
+            style={{
+              background: "rgba(58,96,128,0.25)", border: "1px solid var(--glass-border)",
+              borderRadius: 8, color: "var(--text-secondary)", fontFamily: "'Inter',sans-serif",
+              fontSize: 11, padding: "5px 12px", cursor: "pointer",
+            }}
+          >
             {"\u21BB"} Refresh
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      {/* KPI Cards */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
         {[
-          { label: "Total Predictions", value: predictions.length, color: "text-blue-400", bg: "bg-blue-950", icon: "\uD83C\uDFAF" },
-          { label: "Avg Risk Score", value: `${(avgScore * 100).toFixed(1)}%`, color: "text-yellow-400", bg: "bg-yellow-950", icon: "\uD83D\uDCC8" },
-          { label: "High Risk Areas", value: riskCounts.High + riskCounts["Very High"], color: "text-red-400", bg: "bg-red-950", icon: "\u26A0\uFE0F" },
-          { label: "Safe Areas", value: riskCounts.Low, color: "text-green-400", bg: "bg-green-950", icon: "\u2705" },
+          { label: "Total", value: predictions.length, color: "#3b82f6", bg: "rgba(59,130,246,0.1)", border: "rgba(59,130,246,0.25)", icon: "\uD83C\uDFAF" },
+          { label: "Avg Risk", value: `${(avgScore * 100).toFixed(1)}%`, color: "#f59e0b", bg: "rgba(245,158,11,0.1)", border: "rgba(245,158,11,0.25)", icon: "\uD83D\uDCC8" },
+          { label: "High Risk", value: riskCounts.High + riskCounts["Very High"], color: "#ef4444", bg: "rgba(239,68,68,0.1)", border: "rgba(239,68,68,0.25)", icon: "\u26A0\uFE0F" },
+          { label: "Safe", value: riskCounts.Low, color: "#22c55e", bg: "rgba(34,197,94,0.1)", border: "rgba(34,197,94,0.25)", icon: "\u2705" },
         ].map((kpi) => (
-          <div key={kpi.label} className={`${kpi.bg} rounded-xl p-4 border border-slate-700`}>
-            <div className="text-2xl mb-1">{kpi.icon}</div>
-            <div className={`text-2xl font-bold ${kpi.color}`}>{kpi.value}</div>
-            <div className="text-slate-400 text-xs mt-1">{kpi.label}</div>
+          <div key={kpi.label} style={{
+            background: kpi.bg, border: `1px solid ${kpi.border}`, borderRadius: 14,
+            padding: "14px 16px", display: "flex", flexDirection: "column", gap: 6,
+          }}>
+            <span style={{ fontSize: 18 }}>{kpi.icon}</span>
+            <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 22, fontWeight: 700, color: kpi.color, letterSpacing: "-0.03em" }}>
+              {kpi.value}
+            </div>
+            <div style={{ fontFamily: "'Inter',sans-serif", fontSize: 10, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-muted)" }}>
+              {kpi.label}
+            </div>
           </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-slate-800 rounded-xl p-5">
-          <h3 className="text-slate-300 font-bold mb-1">Risk Distribution</h3>
-          <p className="text-slate-500 text-xs mb-4">Breakdown of all predictions by risk level</p>
+      {/* Charts Row */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        {/* Pie */}
+        <div style={{ background: "var(--glass)", border: "1px solid var(--glass-border)", borderRadius: 16, padding: 18, backdropFilter: "blur(24px) saturate(180%)" }}>
+          <h3 style={{ fontFamily: "'Inter',sans-serif", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-muted)", marginBottom: 12 }}>
+            Risk Distribution
+          </h3>
           {pieData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={220}>
+            <ResponsiveContainer width="100%" height={200}>
               <PieChart>
-                <Pie data={pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={90} paddingAngle={3} dataKey="value">
-                  {pieData.map((entry, index) => (
-                    <Cell key={index} fill={entry.color} />
-                  ))}
+                <Pie data={pieData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={3} dataKey="value">
+                  {pieData.map((entry, index) => <Cell key={index} fill={entry.color} />)}
                 </Pie>
-                <Tooltip contentStyle={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: "8px" }} />
-                <Legend />
+                <Tooltip {...tooltipStyle} />
+                <Legend wrapperStyle={{ fontSize: 11, fontFamily: "'Inter',sans-serif" }} />
               </PieChart>
             </ResponsiveContainer>
           ) : (
-            <div className="flex items-center justify-center h-52 text-slate-500">No data yet</div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 200, color: "var(--text-muted)", fontFamily: "'Inter',sans-serif", fontSize: 12 }}>
+              No data yet
+            </div>
           )}
         </div>
 
-        <div className="bg-slate-800 rounded-xl p-5">
-          <h3 className="text-slate-300 font-bold mb-1">Risk Level Counts</h3>
-          <p className="text-slate-500 text-xs mb-4">Number of predictions per risk category</p>
-          <div className="space-y-4 mt-6">
+        {/* Risk Level Bars */}
+        <div style={{ background: "var(--glass)", border: "1px solid var(--glass-border)", borderRadius: 16, padding: 18, backdropFilter: "blur(24px) saturate(180%)" }}>
+          <h3 style={{ fontFamily: "'Inter',sans-serif", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-muted)", marginBottom: 12 }}>
+            Risk Level Counts
+          </h3>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 8 }}>
             {[
-              { label: "Low", count: riskCounts.Low, color: "bg-green-500", text: "text-green-400" },
-              { label: "Moderate", count: riskCounts.Moderate, color: "bg-yellow-500", text: "text-yellow-400" },
-              { label: "High", count: riskCounts.High, color: "bg-red-500", text: "text-red-400" },
-              { label: "Very High", count: riskCounts["Very High"], color: "bg-red-900", text: "text-red-300" },
+              { label: "Low", count: riskCounts.Low, color: "#22c55e" },
+              { label: "Moderate", count: riskCounts.Moderate, color: "#f59e0b" },
+              { label: "High", count: riskCounts.High, color: "#ef4444" },
+              { label: "Very High", count: riskCounts["Very High"], color: "#7f1d1d" },
             ].map((r) => (
               <div key={r.label}>
-                <div className="flex justify-between text-sm mb-1">
-                  <span className={r.text}>{r.label}</span>
-                  <span className="text-slate-400">{r.count} predictions</span>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+                  <span style={{ fontFamily: "'Inter',sans-serif", fontWeight: 500, color: r.color }}>{r.label}</span>
+                  <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "var(--text-secondary)" }}>{r.count}</span>
                 </div>
-                <div className="w-full bg-slate-700 rounded-full h-3">
-                  <div className={`${r.color} h-3 rounded-full transition-all duration-500`}
-                    style={{ width: predictions.length > 0 ? `${(r.count / predictions.length) * 100}%` : "0%" }}
-                  />
+                <div style={{ width: "100%", height: 6, background: "rgba(58,96,128,0.3)", borderRadius: 3 }}>
+                  <div style={{
+                    height: 6, borderRadius: 3, background: r.color,
+                    width: predictions.length > 0 ? `${(r.count / predictions.length) * 100}%` : "0%",
+                    transition: "width 500ms ease",
+                  }} />
                 </div>
               </div>
             ))}
@@ -175,41 +201,39 @@ export default function MonitoringDashboard() {
         </div>
       </div>
 
+      {/* Timeline */}
       {timelineData.length > 0 && (
-        <div className="bg-slate-800 rounded-xl p-5">
-          <h3 className="text-slate-300 font-bold mb-1">Risk Score Timeline</h3>
-          <p className="text-slate-500 text-xs mb-4">Last 20 predictions over time</p>
-          <ResponsiveContainer width="100%" height={200}>
+        <div style={{ background: "var(--glass)", border: "1px solid var(--glass-border)", borderRadius: 16, padding: 18, backdropFilter: "blur(24px) saturate(180%)" }}>
+          <h3 style={{ fontFamily: "'Inter',sans-serif", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-muted)", marginBottom: 12 }}>
+            Risk Score Timeline
+          </h3>
+          <ResponsiveContainer width="100%" height={180}>
             <LineChart data={timelineData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-              <XAxis dataKey="time" stroke="#94a3b8" tick={{ fontSize: 10 }} />
-              <YAxis domain={[0, 100]} stroke="#94a3b8" tick={{ fontSize: 10 }} />
-              <Tooltip contentStyle={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: "8px" }} />
-              <Line type="monotone" dataKey="score" stroke="#3b82f6" strokeWidth={2} dot={{ fill: "#3b82f6", r: 4 }} activeDot={{ r: 6 }} />
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(58,96,128,0.25)" />
+              <XAxis dataKey="time" stroke="var(--text-muted)" tick={{ fontSize: 10, fontFamily: "'JetBrains Mono',monospace" }} />
+              <YAxis domain={[0, 100]} stroke="var(--text-muted)" tick={{ fontSize: 10, fontFamily: "'JetBrains Mono',monospace" }} />
+              <Tooltip {...tooltipStyle} />
+              <Line type="monotone" dataKey="score" stroke="#3b82f6" strokeWidth={2} dot={{ fill: "#3b82f6", r: 3 }} activeDot={{ r: 5 }} />
             </LineChart>
           </ResponsiveContainer>
         </div>
       )}
 
+      {/* District Bar Chart */}
       {districtData.length > 0 && (
-        <div className="bg-slate-800 rounded-xl p-5">
-          <h3 className="text-slate-300 font-bold mb-1">Average Risk by District</h3>
-          <p className="text-slate-500 text-xs mb-4">Compare flood risk levels across districts</p>
-          <ResponsiveContainer width="100%" height={220}>
+        <div style={{ background: "var(--glass)", border: "1px solid var(--glass-border)", borderRadius: 16, padding: 18, backdropFilter: "blur(24px) saturate(180%)" }}>
+          <h3 style={{ fontFamily: "'Inter',sans-serif", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-muted)", marginBottom: 12 }}>
+            Average Risk by District
+          </h3>
+          <ResponsiveContainer width="100%" height={200}>
             <BarChart data={districtData} margin={{ bottom: 20 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-              <XAxis dataKey="district" stroke="#94a3b8" tick={{ fontSize: 10 }} angle={-30} textAnchor="end" />
-              <YAxis domain={[0, 100]} stroke="#94a3b8" tick={{ fontSize: 10 }} />
-              <Tooltip contentStyle={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: "8px" }} />
-              <Bar dataKey="avgScore" radius={[6, 6, 0, 0]}>
-                {districtData.map((_entry, index) => (
-                  <Cell key={index}
-                    fill={
-                      districtData[index].avgScore > 60 ? "#ef4444" :
-                      districtData[index].avgScore > 40 ? "#f59e0b" :
-                      "#22c55e"
-                    }
-                  />
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(58,96,128,0.25)" />
+              <XAxis dataKey="district" stroke="var(--text-muted)" tick={{ fontSize: 10, fontFamily: "'JetBrains Mono',monospace" }} angle={-30} textAnchor="end" />
+              <YAxis domain={[0, 100]} stroke="var(--text-muted)" tick={{ fontSize: 10, fontFamily: "'JetBrains Mono',monospace" }} />
+              <Tooltip {...tooltipStyle} />
+              <Bar dataKey="avgScore" radius={[4, 4, 0, 0]}>
+                {districtData.map((_e, i) => (
+                  <Cell key={i} fill={districtData[i].avgScore > 60 ? "#ef4444" : districtData[i].avgScore > 40 ? "#f59e0b" : "#22c55e"} />
                 ))}
               </Bar>
             </BarChart>
@@ -218,10 +242,12 @@ export default function MonitoringDashboard() {
       )}
 
       {predictions.length === 0 && (
-        <div className="bg-slate-800 rounded-xl p-12 text-center">
-          <div className="text-5xl mb-4">{"\uD83D\uDCCA"}</div>
-          <p className="text-slate-400 text-lg">No predictions yet</p>
-          <p className="text-slate-500 text-sm mt-2">Make predictions in the Predict tab to see monitoring data here</p>
+        <div style={{ background: "var(--glass)", border: "1px solid var(--glass-border)", borderRadius: 16, padding: 48, textAlign: "center" }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>{"\uD83D\uDCCA"}</div>
+          <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 14, color: "var(--text-secondary)" }}>No predictions yet</p>
+          <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>
+            Make predictions in the Predict tab to see monitoring data
+          </p>
         </div>
       )}
     </div>

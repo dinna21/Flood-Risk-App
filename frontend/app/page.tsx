@@ -251,6 +251,8 @@ export default function Home() {
   const [error, setError]     = useState("");
   const [explanation, setExplanation] = useState("");
   const [activeTab, setActiveTab] = useState("predict");
+  const [alertCount, setAlertCount] = useState(0);
+  const [showNotifPanel, setShowNotifPanel] = useState(false);
 
   useEffect(() => {
     fetchHistory();
@@ -352,7 +354,7 @@ export default function Home() {
       <div className="orb orb-5" aria-hidden="true" />
 
       {/* High-risk alert toasts */}
-      <AlertSystem />
+      <AlertSystem onAlertCount={setAlertCount} />
 
       {/* ── Page shell: full-viewport grid, header + scrollable body ── */}
       <div style={{
@@ -363,8 +365,32 @@ export default function Home() {
 
         {/* ════════ HEADER ════════ */}
         <header className="header-bar" style={{ flexShrink: 0, gridRow: "unset" }}>
-          <div className="header-title">
+          <div className="header-title" style={{ display: "flex", alignItems: "center", gap: 16 }}>
             Sri Lanka <span className="accent">Flood Risk Intelligence</span>
+            {/* Notification bell */}
+            <button
+              onClick={() => setShowNotifPanel(!showNotifPanel)}
+              style={{
+                position: "relative", background: "none", border: "none",
+                cursor: "pointer", padding: 4, fontSize: 18, lineHeight: 1,
+                display: "flex", alignItems: "center",
+              }}
+              title="Notifications"
+            >
+              <span style={{ opacity: 0.7 }}>{"\uD83D\uDD14"}</span>
+              {alertCount > 0 && (
+                <span style={{
+                  position: "absolute", top: -2, right: -4,
+                  background: "#ef4444", color: "#fff",
+                  borderRadius: "50%", width: 16, height: 16,
+                  fontSize: 10, fontFamily: "'Inter',sans-serif",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontWeight: 700, lineHeight: 1,
+                }}>
+                  {alertCount > 9 ? "9+" : alertCount}
+                </span>
+              )}
+            </button>
           </div>
           <div className="header-stats" style={{ display: undefined }}>
             {stats ? (
@@ -646,18 +672,18 @@ export default function Home() {
               <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
                 {/* Prediction result */}
-                <div className="glass-panel result-panel">
-                  <div className="result-title">Prediction Result</div>
+                <div className="glass-panel result-panel" style={{ padding: 16 }}>
+                  <div className="result-title" style={{ marginBottom: 12 }}>Prediction Result</div>
 
                   {!result && !loading && (
-                    <div className="result-empty">
-                      <svg width="52" height="52" viewBox="0 0 52 52" fill="none" aria-hidden="true">
+                    <div className="result-empty" style={{ padding: "16px 0" }}>
+                      <svg width="40" height="40" viewBox="0 0 52 52" fill="none" aria-hidden="true">
                         <circle cx="26" cy="26" r="25" stroke="var(--glass-border)" strokeWidth="1.5"/>
                         <path d="M26 12 C26 12 18 22 18 28 C18 32.4 21.6 36 26 36 C30.4 36 34 32.4 34 28 C34 22 26 12 26 12Z"
                           fill="none" stroke="var(--text-muted)" strokeWidth="1.5" strokeLinejoin="round"/>
                       </svg>
                       <p className="result-empty-text">
-                        Fill in the location details and click Predict to assess flood risk
+                        Fill details and click Predict to assess flood risk
                       </p>
                     </div>
                   )}
@@ -715,8 +741,20 @@ export default function Home() {
                 )}
 
                 {/* Recent predictions */}
-                <div className="glass-panel history-panel" style={{ maxHeight: 320 }}>
-                  <div className="history-title">Recent Predictions</div>
+                <div className="glass-panel history-panel" style={{ maxHeight: 300, padding: 14 }}>
+                  <div className="history-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span>Recent Predictions</span>
+                    <button
+                      onClick={() => { fetchHistory(); fetchStats(); }}
+                      style={{
+                        background: "rgba(58,96,128,0.25)", border: "1px solid var(--glass-border)",
+                        borderRadius: 6, color: "var(--text-muted)", fontFamily: "'Inter',sans-serif",
+                        fontSize: 10, padding: "2px 8px", cursor: "pointer",
+                      }}
+                    >
+                      {"\u21BB"} Refresh
+                    </button>
+                  </div>
                   {history.length === 0 ? (
                     <div className="history-empty">No predictions recorded yet</div>
                   ) : (
