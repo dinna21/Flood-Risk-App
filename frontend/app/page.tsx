@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import MonitoringDashboard from "./components/MonitoringDashboard";
 import PipelineStatus from "./components/PipelineStatus";
 import AlertSystem from "./components/AlertSystem";
+import LiveDataPanel from "./components/LiveDataPanel";
 
 /* Leaflet map must be client-only (no SSR) */
 const FloodRiskMap = dynamic(() => import("./components/Map"), { ssr: false });
@@ -18,6 +19,11 @@ interface PredictionResult {
   district: string;
   message: string;
   timestamp: string;
+  live_data_applied?: boolean;
+  live_data_overrides?: {
+    flood_warning?: boolean;
+    rainfall_7d_mm?: number;
+  };
 }
 
 interface HistoryItem {
@@ -178,6 +184,7 @@ const TABS = [
   { id: "map",      label: "Risk Map"    },
   { id: "monitor",  label: "Monitoring"  },
   { id: "pipeline", label: "\u2699\uFE0F Pipeline" },
+  { id: "live",     label: "\uD83D\uDEE0 Live Data" },
 ];
 
 /* ─── District auto-population defaults ─────────────────────────── */
@@ -255,6 +262,7 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState("predict");
   const [alertCount, setAlertCount] = useState(0);
   const [showNotifPanel, setShowNotifPanel] = useState(false);
+  const [useLiveData, setUseLiveData] = useState(false);
 
   useEffect(() => {
     fetchHistory();
@@ -286,7 +294,7 @@ export default function Home() {
       const res = await fetch(`${API_URL}/predict`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, use_live_data: useLiveData }),
       });
       if (!res.ok) throw new Error("Prediction failed");
       const data = await res.json();
@@ -677,6 +685,47 @@ export default function Home() {
                   </div>
                 </div>{/* end form-content */}
 
+                {/* Live data toggle */}
+                <div style={{
+                  display: "flex", alignItems: "center", gap: 12,
+                  padding: "10px 0", borderTop: "1px solid var(--glass-border)",
+                  borderBottom: "1px solid var(--glass-border)",
+                  marginTop: 4,
+                }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{
+                      fontFamily: "'Inter',sans-serif", fontSize: 12,
+                      fontWeight: 500, color: "var(--text-primary)",
+                    }}>
+                      Use Live Data
+                    </div>
+                    <div style={{
+                      fontFamily: "'Inter',sans-serif", fontSize: 10,
+                      color: "var(--text-muted)", marginTop: 1,
+                    }}>
+                      Auto-fill flood warnings & rainfall from real sources
+                    </div>
+                  </div>
+                  <label className="toggle-switch">
+                    <input
+                      type="checkbox"
+                      checked={useLiveData}
+                      onChange={(e) => setUseLiveData(e.target.checked)}
+                    />
+                    <span className="toggle-slider" />
+                  </label>
+                </div>
+                {useLiveData && (
+                  <div style={{
+                    background: "rgba(56,182,255,0.1)", border: "1px solid rgba(56,182,255,0.2)",
+                    borderRadius: 8, padding: "6px 12px",
+                    fontFamily: "'Inter',sans-serif", fontSize: 10,
+                    color: "var(--accent)", textAlign: "center",
+                  }}>
+                    Live data will override flood event status and rainfall
+                  </div>
+                )}
+
                 <button
                   id="predict-btn"
                   onClick={handleSubmit}
@@ -739,6 +788,38 @@ export default function Home() {
                             </span>
                           </div>
                         </div>
+                        {result.live_data_applied && (
+                          <div style={{
+                            display: "flex", alignItems: "center", gap: 6,
+                            marginTop: 12, padding: "6px 12px",
+                            background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.25)",
+                            borderRadius: 8, width: "fit-content",
+                          }}>
+                            <span style={{ color: "#86efac", fontSize: 12 }}>{"\u2713"}</span>
+                            <span style={{
+                              fontFamily: "'Inter',sans-serif", fontSize: 11,
+                              color: "#86efac", fontWeight: 500,
+                            }}>
+                              Live data was used
+                            </span>
+                            {result.live_data_overrides?.flood_warning !== undefined && (
+                              <span style={{
+                                fontFamily: "'JetBrains Mono',monospace", fontSize: 10,
+                                color: "var(--text-muted)",
+                              }}>
+                                {" | Flood: "}{result.live_data_overrides.flood_warning ? "Yes" : "No"}
+                              </span>
+                            )}
+                            {result.live_data_overrides?.rainfall_7d_mm !== undefined && (
+                              <span style={{
+                                fontFamily: "'JetBrains Mono',monospace", fontSize: 10,
+                                color: "var(--text-muted)",
+                              }}>
+                                {" | Rain: "}{result.live_data_overrides.rainfall_7d_mm.toFixed(1)}mm
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -817,6 +898,9 @@ export default function Home() {
 
           {/* ── PIPELINE TAB ── */}
           {activeTab === "pipeline" && <PipelineStatus />}
+
+          {/* ── LIVE DATA TAB ── */}
+          {activeTab === "live" && <LiveDataPanel />}
 
         </main>
 

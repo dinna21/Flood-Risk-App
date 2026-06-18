@@ -795,3 +795,117 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+/* === LIVE DATA ADDITIONS === */
+
+/* Live Data Panel cards */
+.live-card {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  padding: 16px;
+  transition: all 0.2s ease;
+}
+.live-card:hover {
+  border-color: rgba(56, 182, 255, 0.3);
+  box-shadow: 0 0 20px rgba(56, 182, 255, 0.08);
+}
+.live-card.warning-active {
+  border-color: rgba(255, 61, 0, 0.5);
+  box-shadow: 0 0 20px rgba(255, 61, 0, 0.15);
+}
+
+/* Live Data district grid responsiveness */
+.live-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+@media (max-width: 1024px) {
+  .live-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 640px) {
+  .live-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Warning pulse animation */
+.warning-pulse {
+  animation: warningPulse 2s ease-in-out infinite;
+}
+@keyframes warningPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* Skeleton loading cards */
+.skeleton-card {
+  background: linear-gradient(90deg, var(--depth) 25%, var(--abyss) 50%, var(--depth) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 12px;
+  height: 140px;
+}
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Source status pill */
+.source-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-family: "Inter", sans-serif;
+  background: var(--depth);
+  border: 1px solid var(--glass-border);
+  color: var(--text-secondary);
+}
+
+/* Toggle switch for Use Live Data */
+.toggle-switch {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  display: inline-block;
+  flex-shrink: 0;
+}
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: var(--depth);
+  border-radius: 24px;
+  cursor: pointer;
+  transition: 0.3s;
+  border: 1px solid var(--glass-border);
+}
+.toggle-slider::before {
+  content: "";
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  left: 3px;
+  bottom: 2px;
+  background: var(--text-secondary);
+  border-radius: 50%;
+  transition: 0.3s;
+}
+input:checked + .toggle-slider {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+input:checked + .toggle-slider::before {
+  transform: translateX(20px);
+  background: white;
+}
