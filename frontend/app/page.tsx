@@ -716,10 +716,11 @@ export default function Home() {
                   </div>
                 </div>
 
-                <div className="live-feed-indicator">
-                  <span className="live-feed-dot" />
-                  <span>Live data active</span>
-                </div>
+                <div className="sticky-btn-row">
+                  <div className="live-feed-indicator" style={{ marginBottom: 6 }}>
+                    <span className="live-feed-dot" />
+                    <span>Live data active</span>
+                  </div>
 
                 <button
                   id="predict-btn"
@@ -731,6 +732,7 @@ export default function Home() {
                   {loading ? <RefreshCw size={14} strokeWidth={1.75} style={{ animation: "spin 0.9s linear infinite" }} /> : <ArrowRight size={14} strokeWidth={1.75} />}
                 </button>
                 {error && <div className="error-msg" role="alert">{error}</div>}
+                </div>
                 </div>
               </div>
 
