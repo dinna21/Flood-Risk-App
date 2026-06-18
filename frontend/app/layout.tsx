@@ -4,6 +4,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Sri Lanka Flood Risk Intelligence",
   description: "ML-powered flood risk assessment for Sri Lanka locations — TensorTitans_mlops",
+  icons: { icon: "/logo-svg.svg" },
 };
 
 export default function RootLayout({

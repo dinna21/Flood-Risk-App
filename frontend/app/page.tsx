@@ -443,7 +443,11 @@ export default function Home() {
         {/* ════════ HEADER ════════ */}
         <header className="header-bar polish-header" style={{ flexShrink: 0, gridRow: "unset" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <span className="brand-mark" aria-hidden="true" />
+            <img
+              src="/logo-svg.svg"
+              alt="Flood Risk Intelligence Logo"
+              style={{ width: 40, height: 40, flexShrink: 0 }}
+            />
             <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
               <span className="brand-kicker">Sri Lanka</span>
               <span className="brand-title">Flood Risk Intelligence</span>
@@ -910,10 +914,12 @@ export default function Home() {
 
         {/* Footer */}
         <footer style={{
-          textAlign: "center", padding: "12px 0",
+          textAlign: "center", padding: "16px 0 12px",
           fontFamily: "'Inter',sans-serif", fontSize: 11, color: "var(--text-muted)",
           borderTop: "1px solid var(--glass-border)", flexShrink: 0,
+          display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
         }}>
+          <img src="/logo-svg.svg" alt="Logo" style={{ width: 28, height: 28, opacity: 0.5 }} />
           ML Opsidian Genesis — TensorTitans_mlops — IEEE Student Branch UCSC
         </footer>
       </div>
