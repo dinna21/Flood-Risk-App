@@ -48,12 +48,19 @@ DMC_DISTRICT_MATCHES: Dict[str, List[str]] = {
 FLOOD_KEYWORDS = [
     "flood", "warning", "alert", "inundation", "evacuate",
     "red alert", "orange alert", "overflow", "spill",
-    "water level", "heavy rain", "landslide",
+    "water level", "heavy rain", "landslide", "cyclone",
 ]
 
 FLOOD_PRONE_DISTRICTS = [
     "Colombo", "Gampaha", "Galle", "Matara", "Kalutara",
     "Ratnapura", "Batticaloa",
+]
+
+# Coastal districts (also at risk during cyclones)
+COASTAL_DISTRICTS = [
+    "Colombo", "Gampaha", "Galle", "Matara", "Kalutara",
+    "Hambantota", "Batticaloa", "Ampara", "Trincomalee",
+    "Jaffna", "Mannar", "Puttalam",
 ]
 
 # DMC report listing URLs (Joomla CMS)
@@ -126,6 +133,7 @@ async def fetch_dmc_warnings() -> Dict[str, bool]:
         has_general_warning = any(
             kw in page_text for kw in FLOOD_KEYWORDS
         )
+        has_cyclone = "cyclone" in page_text
 
         # Find report listing rows
         report_rows = soup.select("table tr, .listing tr, .reports tr, .dmc-report")
@@ -140,10 +148,15 @@ async def fetch_dmc_warnings() -> Dict[str, bool]:
             if district_found and has_general_warning:
                 result[district] = True
 
+        # Cyclone = broad trigger: flag all coastal districts
+        if has_cyclone:
+            for d in COASTAL_DISTRICTS:
+                if not result[d]:
+                    result[d] = True
+
         # If general warning exists but no specific districts matched,
         # flag historically flood-prone districts
         if has_general_warning and not any(result.values()):
-            # Check if today's report mentions anything actionable
             warning_active = has_today_report or has_general_warning
             if warning_active:
                 for d in FLOOD_PRONE_DISTRICTS:
@@ -192,7 +205,7 @@ async def _fetch_one_city(
         elif rain_3h is not None:
             rainfall_7d = round(float(rain_3h) / 3 * 24 * 7, 2)
         else:
-            rainfall_7d = 0.0  # No current rain
+            rainfall_7d = None  # No rain data available (not currently raining)
 
         return {
             "rainfall_7d_mm": rainfall_7d,
