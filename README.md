@@ -4,7 +4,7 @@
 ### IEEE Student Branch — University of Colombo School of Computing
 
 [![Backend](https://img.shields.io/badge/Backend-Railway-purple)](https://flood-risk-app-production.up.railway.app)
-[![Frontend](https://img.shields.io/badge/Frontend-Vercel-black)](https://flood-risk-app.vercel.app)
+[![Frontend](https://img.shields.io/badge/Frontend-Vercel-black)](https://flood-risk-app-two.vercel.app/)
 [![Model](https://img.shields.io/badge/Model-CatBoost-blue)](https://catboost.ai)
 [![Score](https://img.shields.io/badge/Best%20Score-0.38114-green)](https://github.com/dinna21/Flood-Risk-App)
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
