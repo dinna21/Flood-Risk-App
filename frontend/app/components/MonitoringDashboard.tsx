@@ -5,6 +5,14 @@ import {
   Tooltip, ResponsiveContainer, BarChart, Bar,
   Cell, PieChart, Pie, Legend
 } from "recharts";
+import {
+  Activity,
+  AlertCircle,
+  BarChart3,
+  RefreshCw,
+  ShieldCheck,
+  TrendingUp,
+} from "./Icons";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -86,7 +94,7 @@ export default function MonitoringDashboard() {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 256 }}>
         <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: "2rem", marginBottom: 12, animation: "spin 1s linear infinite" }}>{"\u2699\uFE0F"}</div>
+          <RefreshCw size={28} strokeWidth={1.75} style={{ margin: "0 auto 12px", animation: "spin 1s linear infinite", color: "var(--accent)" }} />
           <p style={{ color: "#94a3b8", fontFamily: "'Inter',sans-serif", fontSize: 13 }}>Loading monitoring data...</p>
         </div>
       </div>
@@ -103,7 +111,8 @@ export default function MonitoringDashboard() {
       }}>
         <div>
           <h2 style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 16, fontWeight: 600, color: "var(--text-primary)", letterSpacing: "-0.02em" }}>
-            {"\uD83D\uDCCA"} Model Monitoring Dashboard
+            <BarChart3 size={16} strokeWidth={1.75} style={{ color: "var(--accent)", marginRight: 8, verticalAlign: "middle" }} />
+            Model Monitoring Dashboard
           </h2>
           <p style={{ color: "var(--text-muted)", fontSize: 11, marginTop: 2 }}>Real-time prediction analytics</p>
         </div>
@@ -119,7 +128,8 @@ export default function MonitoringDashboard() {
               fontSize: 11, padding: "5px 12px", cursor: "pointer",
             }}
           >
-            {"\u21BB"} Refresh
+            <RefreshCw size={13} strokeWidth={1.75} style={{ marginRight: 6, verticalAlign: "middle" }} />
+            Refresh
           </button>
         </div>
       </div>
@@ -127,21 +137,23 @@ export default function MonitoringDashboard() {
       {/* KPI Cards */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
         {[
-          { label: "Total", value: predictions.length, color: "#3b82f6", bg: "rgba(59,130,246,0.1)", border: "rgba(59,130,246,0.25)", icon: "\uD83C\uDFAF" },
-          { label: "Avg Risk", value: `${(avgScore * 100).toFixed(1)}%`, color: "#f59e0b", bg: "rgba(245,158,11,0.1)", border: "rgba(245,158,11,0.25)", icon: "\uD83D\uDCC8" },
-          { label: "High Risk", value: riskCounts.High + riskCounts["Very High"], color: "#ef4444", bg: "rgba(239,68,68,0.1)", border: "rgba(239,68,68,0.25)", icon: "\u26A0\uFE0F" },
-          { label: "Safe", value: riskCounts.Low, color: "#22c55e", bg: "rgba(34,197,94,0.1)", border: "rgba(34,197,94,0.25)", icon: "\u2705" },
+          { label: "Total Predictions", value: predictions.length, color: "var(--accent)", bg: "rgba(56,182,255,0.08)", border: "rgba(56,182,255,0.22)", icon: Activity },
+          { label: "Avg Risk", value: `${(avgScore * 100).toFixed(1)}%`, color: "var(--risk-moderate)", bg: "rgba(255,179,0,0.08)", border: "rgba(255,179,0,0.22)", icon: TrendingUp },
+          { label: "High Risk", value: riskCounts.High + riskCounts["Very High"], color: "var(--risk-high)", bg: "rgba(255,61,0,0.08)", border: "rgba(255,61,0,0.22)", icon: AlertCircle },
+          { label: "Safe", value: riskCounts.Low, color: "var(--risk-low)", bg: "rgba(0,230,118,0.08)", border: "rgba(0,230,118,0.22)", icon: ShieldCheck },
         ].map((kpi) => (
           <div key={kpi.label} style={{
             background: kpi.bg, border: `1px solid ${kpi.border}`, borderRadius: 14,
             padding: "14px 16px", display: "flex", flexDirection: "column", gap: 6,
           }}>
-            <span style={{ fontSize: 18 }}>{kpi.icon}</span>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+              <kpi.icon size={16} strokeWidth={1.75} style={{ color: kpi.color }} />
+              <span style={{ fontFamily: "'Inter',sans-serif", fontSize: 10, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-muted)", textAlign: "right" }}>
+                {kpi.label}
+              </span>
+            </div>
             <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 22, fontWeight: 700, color: kpi.color, letterSpacing: "-0.03em" }}>
               {kpi.value}
-            </div>
-            <div style={{ fontFamily: "'Inter',sans-serif", fontSize: 10, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-muted)" }}>
-              {kpi.label}
             </div>
           </div>
         ))}
@@ -151,9 +163,7 @@ export default function MonitoringDashboard() {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         {/* Pie */}
         <div style={{ background: "var(--glass)", border: "1px solid var(--glass-border)", borderRadius: 16, padding: 18, backdropFilter: "blur(24px) saturate(180%)" }}>
-          <h3 style={{ fontFamily: "'Inter',sans-serif", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-muted)", marginBottom: 12 }}>
-            Risk Distribution
-          </h3>
+          <div className="section-title-row"><BarChart3 size={14} strokeWidth={1.75} style={{ color: "var(--text-secondary)" }} /><span>Risk Distribution</span></div>
           {pieData.length > 0 ? (
             <ResponsiveContainer width="100%" height={200}>
               <PieChart>
@@ -173,9 +183,7 @@ export default function MonitoringDashboard() {
 
         {/* Risk Level Bars */}
         <div style={{ background: "var(--glass)", border: "1px solid var(--glass-border)", borderRadius: 16, padding: 18, backdropFilter: "blur(24px) saturate(180%)" }}>
-          <h3 style={{ fontFamily: "'Inter',sans-serif", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-muted)", marginBottom: 12 }}>
-            Risk Level Counts
-          </h3>
+          <div className="section-title-row"><AlertCircle size={14} strokeWidth={1.75} style={{ color: "var(--text-secondary)" }} /><span>Risk Level Counts</span></div>
           <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 8 }}>
             {[
               { label: "Low", count: riskCounts.Low, color: "#22c55e" },
@@ -204,9 +212,7 @@ export default function MonitoringDashboard() {
       {/* Timeline */}
       {timelineData.length > 0 && (
         <div style={{ background: "var(--glass)", border: "1px solid var(--glass-border)", borderRadius: 16, padding: 18, backdropFilter: "blur(24px) saturate(180%)" }}>
-          <h3 style={{ fontFamily: "'Inter',sans-serif", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-muted)", marginBottom: 12 }}>
-            Risk Score Timeline
-          </h3>
+          <div className="section-title-row"><TrendingUp size={14} strokeWidth={1.75} style={{ color: "var(--text-secondary)" }} /><span>Risk Score Timeline</span></div>
           <ResponsiveContainer width="100%" height={180}>
             <LineChart data={timelineData}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(58,96,128,0.25)" />
@@ -222,9 +228,7 @@ export default function MonitoringDashboard() {
       {/* District Bar Chart */}
       {districtData.length > 0 && (
         <div style={{ background: "var(--glass)", border: "1px solid var(--glass-border)", borderRadius: 16, padding: 18, backdropFilter: "blur(24px) saturate(180%)" }}>
-          <h3 style={{ fontFamily: "'Inter',sans-serif", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-muted)", marginBottom: 12 }}>
-            Average Risk by District
-          </h3>
+          <div className="section-title-row"><BarChart3 size={14} strokeWidth={1.75} style={{ color: "var(--text-secondary)" }} /><span>Average Risk by District</span></div>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={districtData} margin={{ bottom: 20 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(58,96,128,0.25)" />
@@ -243,7 +247,7 @@ export default function MonitoringDashboard() {
 
       {predictions.length === 0 && (
         <div style={{ background: "var(--glass)", border: "1px solid var(--glass-border)", borderRadius: 16, padding: 48, textAlign: "center" }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>{"\uD83D\uDCCA"}</div>
+          <BarChart3 size={40} strokeWidth={1.5} style={{ color: "var(--text-muted)", marginBottom: 12 }} />
           <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 14, color: "var(--text-secondary)" }}>No predictions yet</p>
           <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>
             Make predictions in the Predict tab to see monitoring data

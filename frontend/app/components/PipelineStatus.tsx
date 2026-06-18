@@ -1,5 +1,16 @@
 "use client";
 import { useEffect, useState } from "react";
+import {
+  AlertTriangle,
+  BarChart3,
+  CheckCircle2,
+  Eye,
+  RefreshCw,
+  RotateCcw,
+  Settings2,
+  ShieldCheck,
+  TrendingUp,
+} from "./Icons";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -130,7 +141,7 @@ export default function PipelineStatus() {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 384 }}>
         <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: "2rem", marginBottom: 12, animation: "spin 1s linear infinite" }}>{"\u2699\uFE0F"}</div>
+          <RefreshCw size={28} strokeWidth={1.75} style={{ margin: "0 auto 12px", animation: "spin 1s linear infinite", color: "var(--accent)" }} />
           <p style={{ color: "#94a3b8" }}>Loading pipeline data...</p>
         </div>
       </div>
@@ -154,7 +165,8 @@ export default function PipelineStatus() {
       {/* Pipeline Health Cards */}
       <div style={panelS}>
         <h3 style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 16, fontWeight: 600, color: "var(--text-primary)", marginBottom: 16, letterSpacing: "-0.02em" }}>
-          {"\u2699\uFE0F"} Pipeline Health
+          <Settings2 size={14} strokeWidth={1.75} style={{ color: "var(--text-secondary)", marginRight: 8, verticalAlign: "middle" }} />
+          Pipeline Health
         </h3>
         {pipeline && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12 }}>
@@ -167,14 +179,18 @@ export default function PipelineStatus() {
               { label: "Training Data", value: pipeline.training_data },
               { label: "Deployment", value: pipeline.deployment_env },
               { label: "Python", value: pipeline.python_version },
-              { label: "Status", value: pipeline.status, color: pipeline.status === "healthy" ? "#22c55e" : "#ef4444" },
+              { label: "Status", value: pipeline.status, color: pipeline.status === "healthy" ? "var(--risk-low)" : "var(--risk-high)", primary: true },
               { label: "Uptime", value: pipeline.uptime },
             ].map((item) => (
-              <div key={item.label} style={{
+              <div key={item.label} className={(item as { primary?: boolean }).primary ? "pipeline-card-primary" : undefined} style={{
                 background: "var(--glass)", border: "1px solid var(--glass-border)",
+                borderLeftColor: (item as { primary?: boolean }).primary ? (item as { color?: string }).color : undefined,
                 borderRadius: 12, padding: "12px 14px", display: "flex", flexDirection: "column", gap: 4,
               }}>
-                <span style={labelS}>{item.label}</span>
+                <span style={{ ...labelS, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                  {(item as { primary?: boolean }).primary && <ShieldCheck size={14} strokeWidth={1.75} style={{ color: (item as { color?: string }).color }} />}
+                  {item.label}
+                </span>
                 <span style={{
                   fontFamily: "'JetBrains Mono',monospace", fontSize: 13, fontWeight: 500,
                   color: (item as { color?: string }).color || "var(--text-primary)",
@@ -191,27 +207,25 @@ export default function PipelineStatus() {
       <div style={panelS}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <h3 style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 16, fontWeight: 600, color: "var(--text-primary)", letterSpacing: "-0.02em" }}>
-            {"\uD83D\uDCC9"} Data Drift Detection
+            <TrendingUp size={14} strokeWidth={1.75} style={{ color: "var(--text-secondary)", marginRight: 8, verticalAlign: "middle" }} />
+            Data Drift Detection
           </h3>
           <button onClick={fetchAll} style={{
             background: "rgba(58,96,128,0.25)", border: "1px solid var(--glass-border)",
             borderRadius: 8, color: "var(--text-secondary)", fontFamily: "'Inter',sans-serif",
             fontSize: 11, padding: "4px 12px", cursor: "pointer",
-          }}>{"\u21BB"} Refresh</button>
+          }}><RefreshCw size={13} strokeWidth={1.75} style={{ marginRight: 6, verticalAlign: "middle" }} />Refresh</button>
         </div>
         {drift && (
           <div>
-            <div style={{
+              <div style={{
               display: "flex", alignItems: "center", gap: 8, marginBottom: 16,
-              padding: "8px 14px", borderRadius: 10,
+              padding: "12px 16px", borderRadius: 10,
               background: drift.drift_detected ? "rgba(239,68,68,0.1)" : "rgba(34,197,94,0.1)",
               border: `1px solid ${drift.drift_detected ? "rgba(239,68,68,0.3)" : "rgba(34,197,94,0.3)"}`,
+              borderLeft: `3px solid ${drift.drift_detected ? "var(--risk-high)" : "var(--risk-low)"}`,
             }}>
-              <span style={{
-                width: 10, height: 10, borderRadius: "50%",
-                background: drift.drift_detected ? "#ef4444" : "#22c55e",
-                boxShadow: `0 0 8px ${drift.drift_detected ? "#ef4444" : "#22c55e"}`,
-              }} />
+              {drift.drift_detected ? <AlertTriangle size={14} strokeWidth={2} style={{ color: "var(--risk-high)" }} /> : <CheckCircle2 size={14} strokeWidth={2} style={{ color: "var(--risk-low)" }} />}
               <span style={{
                 fontFamily: "'Space Grotesk',sans-serif", fontSize: 14, fontWeight: 600,
                 color: drift.drift_detected ? "#fca5a5" : "#86efac",
@@ -246,7 +260,10 @@ export default function PipelineStatus() {
                   </div>
                   <div style={{ display: "flex", justifyContent: "space-between" }}>
                     <span style={labelS}>Recommendation</span>
-                    <span style={{ fontFamily: "'Inter',sans-serif", fontSize: 12, fontWeight: 500, color: drift.drift_detected ? "#fca5a5" : "#86efac" }}>{drift.recommendation}</span>
+                    <span className="recommendation-pill" style={{ color: drift.drift_detected ? "#fca5a5" : "#86efac" }}>
+                      {drift.drift_detected ? <AlertTriangle size={11} strokeWidth={2} /> : <Eye size={11} strokeWidth={1.75} />}
+                      {drift.recommendation}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -258,7 +275,8 @@ export default function PipelineStatus() {
       {/* Performance Metrics */}
       <div style={panelS}>
         <h3 style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 16, fontWeight: 600, color: "var(--text-primary)", marginBottom: 16, letterSpacing: "-0.02em" }}>
-          {"\uD83D\uDCCA"} Performance Metrics
+          <BarChart3 size={14} strokeWidth={1.75} style={{ color: "var(--text-secondary)", marginRight: 8, verticalAlign: "middle" }} />
+          Performance Metrics
         </h3>
         {perf && !perf.error && (
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
@@ -319,7 +337,8 @@ export default function PipelineStatus() {
       {/* Retrain Trigger */}
       <div style={panelS}>
         <h3 style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 16, fontWeight: 600, color: "var(--text-primary)", marginBottom: 16, letterSpacing: "-0.02em" }}>
-          {"\uD83D\uDD04"} Retrain Trigger
+          <RotateCcw size={14} strokeWidth={1.75} style={{ color: "var(--text-secondary)", marginRight: 8, verticalAlign: "middle" }} />
+          Retrain Trigger
         </h3>
         <div style={{ display: "flex", alignItems: "flex-end", gap: 12, flexWrap: "wrap" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1, minWidth: 200 }}>
@@ -343,13 +362,14 @@ export default function PipelineStatus() {
             disabled={retrainLoading}
             style={{
               height: 36, padding: "0 20px",
-              background: retrainLoading ? "rgba(239,68,68,0.3)" : "linear-gradient(135deg, #1A7FCC 0%, #38B6FF 100%)",
-              border: "none", borderRadius: 10, color: "#fff",
-              fontFamily: "'Space Grotesk',sans-serif", fontSize: 12, fontWeight: 700,
-              letterSpacing: "0.06em", textTransform: "uppercase", cursor: "pointer",
+              background: retrainLoading ? "rgba(239,68,68,0.3)" : "linear-gradient(135deg, #38B6FF 0%, #00E5FF 100%)",
+              border: "none", borderRadius: 8, color: "#020B18",
+              fontFamily: "'Inter',sans-serif", fontSize: 13, fontWeight: 600,
+              cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8,
               opacity: retrainLoading ? 0.7 : 1,
             }}
           >
+            <RotateCcw size={14} strokeWidth={1.75} style={retrainLoading ? { animation: "spin 0.9s linear infinite" } : undefined} />
             {retrainLoading ? "Triggering..." : "Trigger Retraining"}
           </button>
         </div>
@@ -389,14 +409,15 @@ export default function PipelineStatus() {
                     opacity: cancelLoading ? 0.5 : 1,
                   }}
                 >
-                  {cancelLoading ? "..." : "\u2716 Cancel"}
+                  {cancelLoading ? "..." : "Cancel"}
                 </button>
               )}
             </div>
           </div>
         )}
         <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 11, color: "var(--text-muted)", marginTop: 10 }}>
-          {"\u26A0\uFE0F"} This will queue a retraining job (15-20 mins)
+          <AlertTriangle size={12} strokeWidth={1.75} style={{ marginRight: 6, verticalAlign: "middle", color: "var(--risk-moderate)" }} />
+          This will queue a retraining job (15-20 mins)
         </p>
       </div>
     </div>

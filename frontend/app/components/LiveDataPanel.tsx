@@ -1,5 +1,13 @@
 "use client";
 import { useEffect, useState, useCallback, useRef } from "react";
+import {
+  AlertTriangle,
+  ArrowRight,
+  CheckCircle2,
+  Clock,
+  Radio,
+  RefreshCw,
+} from "./Icons";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -213,7 +221,7 @@ export default function LiveDataPanel() {
           display: "flex", justifyContent: "space-between", alignItems: "center",
         }}>
           <h2 style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 16, fontWeight: 600, color: "var(--text-primary)" }}>
-            {"🛰"} Live Data
+            <Radio size={15} strokeWidth={1.75} style={{ color: "var(--accent)", marginRight: 8, verticalAlign: "middle" }} /> Live Data
           </h2>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <div className="loading-ring" style={{ width: 20, height: 20, borderWidth: 2 }} />
@@ -234,7 +242,7 @@ export default function LiveDataPanel() {
           background: "rgba(255,61,0,0.08)", border: "1px solid rgba(255,61,0,0.2)",
           borderRadius: 16, padding: 40, textAlign: "center",
         }}>
-          <div style={{ fontSize: 36, marginBottom: 12 }}>{"⚠"}</div>
+          <AlertTriangle size={36} strokeWidth={1.5} style={{ color: "var(--risk-high)", marginBottom: 12 }} />
           <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 14, color: "var(--text-secondary)", marginBottom: 4 }}>
             Live data temporarily unavailable
           </p>
@@ -267,20 +275,20 @@ export default function LiveDataPanel() {
   const isVeryStale = cacheAge >= 10800;
 
   const dmcLabel =
-    sourcesStatus.dmc === "ok" ? "DMC ✓ Active" :
-    sourcesStatus.dmc === "error" ? "DMC ✗ Unreachable" :
-    "DMC — No warnings posted";
+    sourcesStatus.dmc === "ok" ? "Active" :
+    sourcesStatus.dmc === "error" ? "Unreachable" :
+    "No warnings posted";
   const owmLabel =
-    sourcesStatus.owm === "ok" ? "OWM ✓ Live weather" :
-    sourcesStatus.owm === "error" ? "OWM ✗ API error" :
-    "OWM — Key not configured";
+    sourcesStatus.owm === "ok" ? "Live weather" :
+    sourcesStatus.owm === "error" ? "API error" :
+    "Key not configured";
 
   const refreshBtnLabel =
     refreshing ? "Refreshing..." :
-    refreshStatus === "success" ? "✓ Updated" :
-    refreshStatus === "fail" ? "✗ Failed" :
-    refreshStatus === "ratelimited" ? `⏱ Wait ${retryAfter}s` :
-    "↻ Refresh Now";
+    refreshStatus === "success" ? "Updated" :
+    refreshStatus === "fail" ? "Failed" :
+    refreshStatus === "ratelimited" ? `Wait ${retryAfter}s` :
+    "Refresh";
 
   const countdownDisplay =
     `${Math.floor(countdown / 60)}:${String(countdown % 60).padStart(2, "0")}`;
@@ -303,7 +311,7 @@ export default function LiveDataPanel() {
               fontFamily: "'Space Grotesk',sans-serif", fontSize: 16,
               fontWeight: 600, color: "var(--text-primary)", letterSpacing: "-0.02em",
             }}>
-              {"🛰"} Live Data
+              <Radio size={15} strokeWidth={1.75} style={{ color: "var(--accent)", marginRight: 8, verticalAlign: "middle" }} /> Live Data
             </h2>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
@@ -315,9 +323,7 @@ export default function LiveDataPanel() {
               <SourceDot status={sourcesStatus.owm} />
               {owmLabel}
             </span>
-            <span className="live-countdown">
-              Next refresh in {countdownDisplay}
-            </span>
+            <span className="live-countdown" style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><Clock size={11} strokeWidth={2} /> {countdownDisplay}</span>
             <button
               onClick={manualRefresh}
               disabled={refreshing}
@@ -333,7 +339,7 @@ export default function LiveDataPanel() {
                 opacity: refreshing ? 0.6 : 1, whiteSpace: "nowrap",
               }}
             >
-              {refreshing ? "..." : refreshBtnLabel}
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><RefreshCw size={13} strokeWidth={1.75} style={refreshing ? { animation: "spin 0.9s linear infinite" } : undefined} />{refreshing ? "Refreshing..." : refreshBtnLabel}</span>
             </button>
           </div>
         </div>
@@ -344,9 +350,9 @@ export default function LiveDataPanel() {
 
       {/* SECTION B — Warning Banner */}
       {totalWarnings > 0 ? (
-        <div className="warning-banner-active scan-line" style={{ marginBottom: 16 }}>
+        <div className="warning-banner-active" style={{ marginBottom: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <span className="warning-pulse" style={{ fontSize: 18 }}>{"⚠"}</span>
+            <AlertTriangle size={15} strokeWidth={2} style={{ color: "var(--risk-high)" }} />
             <span style={{
               fontFamily: "'Space Grotesk',sans-serif", fontSize: 14,
               fontWeight: 600, color: "#fc8181",
@@ -370,7 +376,7 @@ export default function LiveDataPanel() {
               }}
                 onClick={() => toggleExpand(d)}
               >
-                {"⚠"} {d}
+                <AlertTriangle size={12} strokeWidth={2} /> {d}
               </span>
             ))}
           </div>
@@ -378,7 +384,7 @@ export default function LiveDataPanel() {
       ) : isFresh && cacheAge >= 0 ? (
         <div className="warning-banner-clear" style={{ marginBottom: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ fontSize: 18 }}>{"✓"}</span>
+            <Clock size={15} strokeWidth={2} style={{ color: "var(--risk-moderate)" }} />
             <span style={{
               fontFamily: "'Space Grotesk',sans-serif", fontSize: 14,
               fontWeight: 600, color: "#86efac",
@@ -390,7 +396,7 @@ export default function LiveDataPanel() {
       ) : (
         <div className="warning-banner-stale" style={{ marginBottom: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ fontSize: 18 }}>{"⚠"}</span>
+            <CheckCircle2 size={15} strokeWidth={2} style={{ color: "var(--risk-low)" }} />
             <span style={{
               fontFamily: "'Space Grotesk',sans-serif", fontSize: 14,
               fontWeight: 600, color: "#fcd34d",
@@ -443,7 +449,7 @@ export default function LiveDataPanel() {
                     fontWeight: 600, color: "#fc8181",
                     whiteSpace: "nowrap",
                   }}>
-                    {"⚠"} ACTIVE WARNING
+                    <AlertTriangle size={12} strokeWidth={2} /> Warning
                   </span>
                 ) : (
                   <span style={{
@@ -453,7 +459,7 @@ export default function LiveDataPanel() {
                     fontWeight: 500, color: "#86efac",
                     whiteSpace: "nowrap",
                   }}>
-                    {"✓"} Clear
+                    <CheckCircle2 size={12} strokeWidth={2} /> Clear
                   </span>
                 )}
               </div>
@@ -551,7 +557,9 @@ export default function LiveDataPanel() {
                       }));
                     }}
                   >
-                    Quick Predict →
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                      <ArrowRight size={12} strokeWidth={1.75} /> Predict
+                    </span>
                   </button>
                 </div>
               )}
@@ -578,3 +586,5 @@ export default function LiveDataPanel() {
     </div>
   );
 }
+
+

@@ -5,6 +5,23 @@ import MonitoringDashboard from "./components/MonitoringDashboard";
 import PipelineStatus from "./components/PipelineStatus";
 import AlertSystem from "./components/AlertSystem";
 import LiveDataPanel from "./components/LiveDataPanel";
+import {
+  ArrowRight,
+  BarChart3,
+  Bell,
+  Brain,
+  CheckCircle2,
+  ChevronDown,
+  Clock,
+  Crosshair,
+  MapIcon,
+  MapPin,
+  Radio,
+  RefreshCw,
+  Settings2,
+  Waves,
+  Zap,
+} from "./components/Icons";
 
 /* Leaflet map must be client-only (no SSR) */
 const FloodRiskMap = dynamic(() => import("./components/Map"), { ssr: false });
@@ -149,30 +166,39 @@ function useCountUp(target: number, duration = 900): number {
   return value;
 }
 
-/* ─── Risk Arc SVG (unchanged) ──────────────────────────────────── */
+/* ─── Risk Arc SVG (88px compact) ────────────────────────────────── */
 function RiskRing({ score, color }: { score: number; color: string }) {
-  const radius       = 88;
+  const radius       = 36;
   const circumference = 2 * Math.PI * radius;
   const offset        = circumference - (score / 100) * circumference;
   const animatedScore = useCountUp(score, 800);
 
   return (
-    <div className="risk-ring-container">
-      <svg className="risk-ring-svg" viewBox="0 0 200 200" aria-hidden="true">
-        <circle className="risk-ring-bg" cx="100" cy="100" r={radius} />
+    <div className="result-ring-wrap">
+      <svg viewBox="0 0 88 88" aria-hidden="true">
+        <circle cx="44" cy="44" r={radius}
+          fill="none"
+          stroke="rgba(100,200,255,0.08)"
+          strokeWidth="6" />
         <circle
-          className="risk-ring-fill"
-          cx="100" cy="100" r={radius}
+          cx="44" cy="44" r={radius}
+          fill="none"
           stroke={color}
+          strokeWidth="6"
+          strokeLinecap="round"
           strokeDasharray={circumference}
           strokeDashoffset={offset}
+          transform="rotate(-90 44 44)"
+          style={{ transition: "stroke-dashoffset 0.8s cubic-bezier(0.4,0,0.2,1), stroke 0.3s ease" }}
         />
       </svg>
-      <div className="risk-score-center">
-        <span className="risk-score-value" style={{ color }}>
+      <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+        <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 18, fontWeight: 700, color, lineHeight: 1, letterSpacing: "-0.03em" }}>
           {animatedScore.toFixed(1)}
         </span>
-        <span className="risk-score-pct">%</span>
+        <span style={{ fontFamily: "'Inter',sans-serif", fontSize: 9, fontWeight: 400, color: "var(--text-muted)", marginTop: 1 }}>
+          %
+        </span>
       </div>
     </div>
   );
@@ -180,11 +206,11 @@ function RiskRing({ score, color }: { score: number; color: string }) {
 
 /* ─── Tab definitions ────────────────────────────────────────────── */
 const TABS = [
-  { id: "predict",  label: "Predict"     },
-  { id: "map",      label: "Risk Map"    },
-  { id: "monitor",  label: "Monitoring"  },
-  { id: "pipeline", label: "\u2699\uFE0F Pipeline" },
-  { id: "live",     label: "\uD83D\uDEE0 Live Data" },
+  { id: "predict",  label: "Predict",    icon: Crosshair },
+  { id: "map",      label: "Risk Map",   icon: MapIcon },
+  { id: "monitor",  label: "Monitoring", icon: BarChart3 },
+  { id: "pipeline", label: "Pipeline",   icon: Settings2 },
+  { id: "live",     label: "Live Data",  icon: Radio },
 ];
 
 /* ─── District auto-population defaults ─────────────────────────── */
@@ -417,96 +443,73 @@ export default function Home() {
       }}>
 
         {/* ════════ HEADER ════════ */}
-        <header className="header-bar" style={{ flexShrink: 0, gridRow: "unset" }}>
-          <div className="header-title" style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            Sri Lanka <span className="accent">Flood Risk Intelligence</span>
-            {/* Notification bell */}
+        <header className="header-bar polish-header" style={{ flexShrink: 0, gridRow: "unset" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <span className="brand-mark" aria-hidden="true" />
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+              <span className="brand-kicker">Sri Lanka</span>
+              <span className="brand-title">Flood Risk Intelligence</span>
+            </div>
+          </div>
+          <div className="header-stats" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {stats ? (
+              <div className="kpi-row">
+                <div className="kpi-chip">
+                  <div className="kpi-value" style={{ color: "var(--text-primary)" }}>{stats.total_predictions}</div>
+                  <div className="kpi-label">Total Predictions</div>
+                </div>
+                <div className="kpi-chip">
+                  <div className="kpi-value" style={{ color: "var(--risk-moderate)" }}>{(stats.avg_risk_score * 100).toFixed(1)}%</div>
+                  <div className="kpi-label">Avg Risk</div>
+                </div>
+                <div className="kpi-chip">
+                  <div className="kpi-value" style={{ color: "var(--risk-high)" }}>{stats.high_risk_count}</div>
+                  <div className="kpi-label">High Risk</div>
+                </div>
+              </div>
+            ) : (
+              <div className="kpi-row">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="kpi-chip">
+                    <div className="kpi-value" style={{ color: "var(--text-muted)" }}>--</div>
+                    <div className="kpi-label">Loading</div>
+                  </div>
+                ))}
+              </div>
+            )}
             <button
               onClick={() => setShowNotifPanel(!showNotifPanel)}
-              style={{
-                position: "relative", background: "none", border: "none",
-                cursor: "pointer", padding: 4, fontSize: 18, lineHeight: 1,
-                display: "flex", alignItems: "center",
-              }}
+              className="icon-btn"
+              style={{ position: "relative", width: 32, height: 32 }}
               title="Notifications"
+              aria-label="Notifications"
             >
-              <span style={{ opacity: 0.7 }}>{"\uD83D\uDD14"}</span>
+              <Bell size={16} strokeWidth={1.75} />
               {alertCount > 0 && (
-                <span style={{
-                  position: "absolute", top: -2, right: -4,
-                  background: "#ef4444", color: "#fff",
-                  borderRadius: "50%", width: 16, height: 16,
-                  fontSize: 10, fontFamily: "'Inter',sans-serif",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontWeight: 700, lineHeight: 1,
-                }}>
+                <span className="notif-badge">
                   {alertCount > 9 ? "9+" : alertCount}
                 </span>
               )}
             </button>
           </div>
-          <div className="header-stats" style={{ display: undefined }}>
-            {stats ? (
-              <div className="hidden sm:flex gap-6">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-blue-400">{stats.total_predictions}</div>
-                  <div className="text-slate-400 text-xs">Predictions</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-yellow-400">{(stats.avg_risk_score * 100).toFixed(1)}%</div>
-                  <div className="text-slate-400 text-xs">Avg Risk</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-red-400">{stats.high_risk_count}</div>
-                  <div className="text-slate-400 text-xs">High Risk</div>
-                </div>
-              </div>
-            ) : (
-              <div className="hidden sm:flex gap-6">
-                {[1, 2, 3].map(i => (
-                  <div key={i} className="text-center animate-pulse">
-                    <div className="h-8 w-12 bg-slate-700 rounded mb-1 mx-auto"></div>
-                    <div className="h-3 w-16 bg-slate-700 rounded"></div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
         </header>
 
         {/* ════════ TAB BAR ════════ */}
-        <nav style={{
-          display: "flex", gap: 2, padding: "0 24px",
-          background: "rgba(4,20,36,0.70)",
-          borderBottom: "1px solid var(--glass-border)",
-          backdropFilter: "blur(16px)",
-          WebkitBackdropFilter: "blur(16px)",
-          flexShrink: 0, zIndex: 9,
-          overflowX: "auto",
-        }}>
+        <nav className="polish-tabbar" style={{ flexShrink: 0, zIndex: 9 }}>
           {TABS.map((tab) => {
             const active = activeTab === tab.id;
+            const Icon = tab.icon;
             return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                style={{
-                  padding: "12px 18px",
-                  fontFamily: "'Space Grotesk',sans-serif",
-                  fontSize: 13, fontWeight: 600,
-                  letterSpacing: "0.04em",
-                  color: active ? "var(--accent)" : "var(--text-muted)",
-                  background: "none", border: "none",
-                  borderBottom: active ? "2px solid var(--accent)" : "2px solid transparent",
-                  cursor: "pointer",
-                  transition: "color 200ms ease, border-color 200ms ease",
-                  whiteSpace: "nowrap",
-                }}
+                className={`tab-item${active ? " active" : ""}`}
               >
-                {tab.label}
-                {tab.id === "live" && (
-                  <span className="live-tab-dot" title="Live updating content" />
-                )}
+                <span style={{ position: "relative", display: "inline-flex" }}>
+                  <Icon size={15} strokeWidth={1.75} />
+                  {tab.id === "live" && <span className="tab-live-dot" />}
+                </span>
+                <span>{tab.label}</span>
               </button>
             );
           })}
@@ -517,20 +520,15 @@ export default function Home() {
 
           {/* ── PREDICT TAB ── */}
           {activeTab === "predict" && (
-            <div style={{
-              display: "grid",
-              gridTemplateColumns: "400px 1fr",
-              gap: 16,
-              maxWidth: 1280,
-              margin: "0 auto",
-            }}>
+            <div className="predict-outer">
 
-              {/* Form panel */}
-              <div className="glass-panel form-panel" style={{ height: "fit-content" }}>
+              {/* ── LEFT FORM PANEL (unchanged content, new wrapper) ── */}
+              <div className="predict-form-panel">
+               <div className="glass-panel form-panel" style={{ height: "fit-content" }}>
                 <div className="form-content">
 
                   {/* GROUP 1 — LOCATION */}
-                  <div className="form-group-label">Location</div>
+                  <div className="form-section-header"><span>Location</span><div className="section-rule" /></div>
                   <div className="form-group">
                     <div className="fields-1">
                       <div className="field-row">
@@ -547,6 +545,7 @@ export default function Home() {
                               <option key={d} value={d}>{d}</option>
                             ))}
                           </select>
+                          <ChevronDown size={12} strokeWidth={1.75} />
                         </div>
                       </div>
                     </div>
@@ -567,7 +566,7 @@ export default function Home() {
                   </div>
 
                   {/* GROUP 2 — WEATHER & TERRAIN */}
-                  <div className="form-group-label">Weather &amp; Terrain</div>
+                  <div className="form-section-header"><span>Weather &amp; Terrain</span><div className="section-rule" /></div>
                   <div className="form-group">
                     <div className="fields-3">
                       <div className="field-row">
@@ -592,7 +591,7 @@ export default function Home() {
                   </div>
 
                   {/* GROUP 3 — ENVIRONMENT */}
-                  <div className="form-group-label">Environment</div>
+                  <div className="form-section-header"><span>Environment</span><div className="section-rule" /></div>
                   <div className="form-group">
                     <div className="fields-2">
                       <div className="field-row">
@@ -617,6 +616,7 @@ export default function Home() {
                             {["Urban","Forest","Agriculture","Wetland","Water","Barren"]
                               .map((o) => <option key={o} value={o}>{o}</option>)}
                           </select>
+                          <ChevronDown size={12} strokeWidth={1.75} />
                         </div>
                       </div>
                       <div className="field-row">
@@ -627,13 +627,14 @@ export default function Home() {
                             {["Clay","Sandy","Loam","Silt","Rock"]
                               .map((o) => <option key={o} value={o}>{o}</option>)}
                           </select>
+                          <ChevronDown size={12} strokeWidth={1.75} />
                         </div>
                       </div>
                     </div>
                   </div>
 
                   {/* GROUP 4 — RISK FACTORS */}
-                  <div className="form-group-label">Risk Factors</div>
+                  <div className="form-section-header"><span>Risk Factors</span><div className="section-rule" /></div>
                   <div className="form-group">
                     <div className="fields-2">
                       <div className="field-row">
@@ -643,6 +644,7 @@ export default function Home() {
                             onChange={handleChange} className="glass-input">
                             {["Paved","Gravel","Dirt","None"].map((o) => <option key={o} value={o}>{o}</option>)}
                           </select>
+                          <ChevronDown size={12} strokeWidth={1.75} />
                         </div>
                       </div>
                       <div className="field-row">
@@ -652,6 +654,7 @@ export default function Home() {
                             onChange={handleChange} className="glass-input">
                             {["Low","Medium","High"].map((o) => <option key={o} value={o}>{o}</option>)}
                           </select>
+                          <ChevronDown size={12} strokeWidth={1.75} />
                         </div>
                       </div>
                     </div>
@@ -664,6 +667,7 @@ export default function Home() {
                             onChange={handleChange} className="glass-input">
                             {["Yes","No"].map((o) => <option key={o} value={o}>{o}</option>)}
                           </select>
+                          <ChevronDown size={12} strokeWidth={1.75} />
                         </div>
                       </div>
                       <div className="field-row">
@@ -673,6 +677,7 @@ export default function Home() {
                             onChange={handleChange} className="glass-input">
                             {["Urban","Rural"].map((o) => <option key={o} value={o}>{o}</option>)}
                           </select>
+                          <ChevronDown size={12} strokeWidth={1.75} />
                         </div>
                       </div>
                     </div>
@@ -714,15 +719,11 @@ export default function Home() {
                 </div>{/* end form-content */}
 
                 {/* Live data toggle */}
-                <div style={{
-                  display: "flex", alignItems: "center", gap: 12,
-                  padding: "10px 0", borderTop: "1px solid var(--glass-border)",
-                  borderBottom: "1px solid var(--glass-border)",
-                  marginTop: 4,
-                }}>
+                <div className="live-toggle-row">
+                  <Radio size={14} strokeWidth={1.75} style={{ color: "var(--accent)", flexShrink: 0 }} />
                   <div style={{ flex: 1 }}>
                     <div style={{
-                      fontFamily: "'Inter',sans-serif", fontSize: 12,
+                      fontFamily: "'Inter',sans-serif", fontSize: 13,
                       fontWeight: 500, color: "var(--text-primary)",
                     }}>
                       Use Live Data
@@ -731,7 +732,7 @@ export default function Home() {
                       fontFamily: "'Inter',sans-serif", fontSize: 10,
                       color: "var(--text-muted)", marginTop: 1,
                     }}>
-                      Auto-fill flood warnings & rainfall from real sources
+                      Syncs flood warnings & rainfall from live sources
                     </div>
                   </div>
                   <label className="toggle-switch">
@@ -761,156 +762,168 @@ export default function Home() {
                   className={`predict-btn${loading ? " loading" : ""}`}
                 >
                   {loading ? "Analyzing Risk..." : "Predict Flood Risk"}
+                  {loading ? <RefreshCw size={14} strokeWidth={1.75} style={{ animation: "spin 0.9s linear infinite" }} /> : <ArrowRight size={14} strokeWidth={1.75} />}
                 </button>
                 {error && <div className="error-msg" role="alert">{error}</div>}
+                </div>
               </div>
 
-              {/* Results column */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              {/* ── RIGHT RESULTS PANEL (3 sections, no outer scroll) ── */}
+              <div className="predict-result-panel">
 
-                {/* Prediction result */}
-                <div className="glass-panel result-panel" style={{ padding: 16 }}>
-                  <div className="result-title" style={{ marginBottom: 12 }}>Prediction Result</div>
+                {/* SECTION A: Ring + result — horizontal compact layout */}
+                <div className="result-section-a">
 
-                  {!result && !loading && (
-                    <div className="result-empty" style={{ padding: "16px 0" }}>
-                      <svg width="40" height="40" viewBox="0 0 52 52" fill="none" aria-hidden="true">
-                        <circle cx="26" cy="26" r="25" stroke="var(--glass-border)" strokeWidth="1.5"/>
-                        <path d="M26 12 C26 12 18 22 18 28 C18 32.4 21.6 36 26 36 C30.4 36 34 32.4 34 28 C34 22 26 12 26 12Z"
-                          fill="none" stroke="var(--text-muted)" strokeWidth="1.5" strokeLinejoin="round"/>
-                      </svg>
-                      <p className="result-empty-text">
-                        Fill details and click Predict to assess flood risk
-                      </p>
-                    </div>
+                  {/* Left: SVG Ring (88px) */}
+                  {result && !loading ? (
+                    <RiskRing score={riskScore} color={riskColor} />
+                  ) : (
+                    <div className="ring-placeholder" />
                   )}
 
-                  {loading && (
-                    <div className="result-empty">
-                      <div className="loading-ring" />
-                      <p className="result-empty-text">Analyzing flood risk...</p>
-                    </div>
-                  )}
-
-                  {result && !loading && (
-                    <div className="result-content" key={result.timestamp}>
-                      <RiskRing score={riskScore} color={riskColor} />
-                      <div className="risk-details">
+                  {/* Right: result content */}
+                  <div className="result-content">
+                    {result && !loading ? (
+                      <>
                         <div className={`risk-badge ${getRiskClass(result.risk_level)}`}>
                           {result.risk_level} Risk
                         </div>
                         <p className="risk-message">{result.message}</p>
-                        <div className="risk-meta">
-                          <div className="risk-meta-item">
-                            <span className="risk-meta-label">District</span>
-                            <span className="risk-meta-value">{result.district}</span>
+                        <div className="result-meta-row" style={{ marginTop: 4 }}>
+                          <div className="result-meta-chip">
+                            <MapPin size={12} strokeWidth={2} />
+                            <span>{result.district}</span>
                           </div>
-                          <div className="risk-meta-item">
-                            <span className="risk-meta-label">Time</span>
-                            <span className="risk-meta-value">{new Date(result.timestamp).toLocaleTimeString()}</span>
+                          <div className="result-meta-chip">
+                            <Clock size={12} strokeWidth={2} />
+                            <span>{new Date(result.timestamp).toLocaleTimeString()}</span>
                           </div>
-                          <div className="risk-meta-item">
-                            <span className="risk-meta-label">Score</span>
-                            <span className="risk-meta-value" style={{ color: riskColor }}>
+                          <div className="result-meta-chip">
+                            <Waves size={12} strokeWidth={2} />
+                            <span style={{ color: riskColor }}>
                               {(result.flood_risk_score * 100).toFixed(2)}%
                             </span>
                           </div>
                         </div>
                         {result.live_data_applied && (
-                          <div style={{
-                            display: "flex", alignItems: "center", gap: 6,
-                            marginTop: 12, padding: "6px 12px",
-                            background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.25)",
-                            borderRadius: 8, width: "fit-content",
-                          }}>
-                            <span style={{ color: "#86efac", fontSize: 12 }}>{"\u2713"}</span>
-                            <span style={{
-                              fontFamily: "'Inter',sans-serif", fontSize: 11,
-                              color: "#86efac", fontWeight: 500,
-                            }}>
-                              Live data was used
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8,
+                            padding: "5px 10px", background: "rgba(34,197,94,0.1)",
+                            border: "1px solid rgba(34,197,94,0.25)", borderRadius: 6, width: "fit-content" }}>
+                            <CheckCircle2 size={11} strokeWidth={2} style={{ color: "var(--risk-low)" }} />
+                            <span style={{ fontFamily: "'Inter',sans-serif", fontSize: 10, color: "#86efac", fontWeight: 500 }}>
+                              Live data applied
                             </span>
-                            {result.live_data_overrides?.flood_warning !== undefined && (
-                              <span style={{
-                                fontFamily: "'JetBrains Mono',monospace", fontSize: 10,
-                                color: "var(--text-muted)",
-                              }}>
-                                {" | Flood: "}{result.live_data_overrides.flood_warning ? "Yes" : "No"}
-                              </span>
-                            )}
-                            {result.live_data_overrides?.rainfall_7d_mm !== undefined && (
-                              <span style={{
-                                fontFamily: "'JetBrains Mono',monospace", fontSize: 10,
-                                color: "var(--text-muted)",
-                              }}>
-                                {" | Rain: "}{result.live_data_overrides.rainfall_7d_mm.toFixed(1)}mm
-                              </span>
-                            )}
                           </div>
                         )}
-                        {result.live_data_applied && (
-                          <div className="live-powered-pill" style={{ marginTop: 8 }}>
-                            {"⚡"} Powered by live data
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* AI Risk Analysis */}
-                {result && !loading && explanation && (
-                  <div className="glass-panel result-panel" style={{ marginTop: 16 }}>
-                    <div className="result-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ fontSize: 22 }}>🤖</span>
-                      AI Risk Analysis
-                    </div>
-                    <p style={{
-                      color: "var(--text-secondary)", fontSize: 13,
-                      lineHeight: 1.7, marginTop: 12, whiteSpace: "pre-line",
-                    }}>
-                      {explanation}
-                    </p>
+                      </>
+                    ) : loading ? (
+                      <>
+                        <div className="content-placeholder-bar" style={{ width: 80 }} />
+                        <div className="content-placeholder-bar" style={{ width: 180 }} />
+                        <div className="content-placeholder-bar" style={{ width: 130 }} />
+                        <div className="loading-ring" style={{ marginTop: 8 }} />
+                      </>
+                    ) : (
+                      <>
+                        <div className="content-placeholder-bar" style={{ width: 80 }} />
+                        <div className="content-placeholder-bar" style={{ width: 180 }} />
+                        <div className="content-placeholder-bar" style={{ width: 130 }} />
+                        <p style={{ fontSize: 12, color: "var(--text-muted)", margin: 0, fontFamily: "'Inter',sans-serif" }}>
+                          Fill details and click Predict
+                        </p>
+                      </>
+                    )}
                   </div>
-                )}
+                </div>{/* end section-a */}
 
-                {/* Recent predictions */}
-                <div className="glass-panel history-panel" style={{ maxHeight: 300, padding: 14 }}>
-                  <div className="history-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span>Recent Predictions</span>
-                    <button
-                      onClick={() => { fetchHistory(); fetchStats(); }}
-                      style={{
-                        background: "rgba(58,96,128,0.25)", border: "1px solid var(--glass-border)",
-                        borderRadius: 6, color: "var(--text-muted)", fontFamily: "'Inter',sans-serif",
-                        fontSize: 10, padding: "2px 8px", cursor: "pointer",
-                      }}
-                    >
-                      {"\u21BB"} Refresh
+                {/* SECTION B: AI Risk Analysis — flex grow, internally scrollable */}
+                <div className="result-section-b">
+                  <div style={{
+                    position: "sticky", top: 0, background: "var(--abyss)", zIndex: 1,
+                    padding: "12px 16px 8px", borderBottom: "1px solid rgba(100,200,255,0.06)",
+                    display: "flex", alignItems: "center", gap: 8,
+                  }}>
+                    <Brain size={13} strokeWidth={1.75} color="var(--text-secondary)" />
+                    <span style={{
+                      fontFamily: "'Inter',sans-serif", fontWeight: 600, fontSize: 12,
+                      color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.06em",
+                    }}>
+                      AI Risk Analysis
+                    </span>
+                  </div>
+                  <div style={{ padding: "12px 16px" }}>
+                    {result && !loading && explanation ? (
+                      <p style={{
+                        color: "var(--text-secondary)", fontSize: 13,
+                        lineHeight: 1.6, margin: 0, whiteSpace: "pre-line",
+                        fontFamily: "'Inter',sans-serif",
+                      }}>
+                        {explanation}
+                      </p>
+                    ) : (
+                      <div style={{
+                        display: "flex", flexDirection: "column", alignItems: "center",
+                        justifyContent: "center", padding: "24px 0", gap: 10, textAlign: "center",
+                      }}>
+                        <Brain size={24} strokeWidth={1.5} color="var(--text-muted)" />
+                        <p style={{ fontSize: 13, color: "var(--text-muted)", margin: 0, fontFamily: "'Inter',sans-serif" }}>
+                          Fill details and click Predict to see AI analysis
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>{/* end section-b */}
+
+                {/* SECTION C: Recent Predictions — max 200px, internal scroll */}
+                <div className="result-section-c">
+                  <div className="result-section-c-header">
+                    <span style={{
+                      fontFamily: "'Inter',sans-serif", fontWeight: 600, fontSize: 12,
+                      color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.06em",
+                    }}>
+                      Recent Predictions
+                    </span>
+                    <button onClick={() => { fetchHistory(); fetchStats(); }}
+                      style={{ background: "none", border: "none", cursor: "pointer",
+                        padding: 2, color: "var(--text-muted)", display: "flex", alignItems: "center" }}
+                      title="Refresh">
+                      <RefreshCw size={12} strokeWidth={1.75} />
                     </button>
                   </div>
                   {history.length === 0 ? (
-                    <div className="history-empty">No predictions recorded yet</div>
-                  ) : (
-                    <div className="history-list">
-                      {history.slice(0, 10).map((item) => (
-                        <div className="history-item" key={item.id}>
-                          <span className="history-district">{item.district}</span>
-                          <span className="history-score" style={{ color: historyScoreColor(item.risk_level) }}>
-                            {(item.flood_risk_score * 100).toFixed(1)}%
-                          </span>
-                          <span className={`history-badge ${getRiskClass(item.risk_level)}`}>
-                            {item.risk_level}
-                          </span>
-                          <span className="history-time">
-                            {new Date(item.created_at).toLocaleTimeString()}
-                          </span>
-                        </div>
-                      ))}
+                    <div style={{ padding: 16, textAlign: "center",
+                      fontSize: 12, color: "var(--text-muted)", fontFamily: "'Inter',sans-serif" }}>
+                      No predictions recorded yet
                     </div>
+                  ) : (
+                    history.slice(0, 10).map((item) => (
+                      <div className="pred-row" key={item.id}>
+                        <span style={{
+                          flex: 1, fontFamily: "'Inter',sans-serif", fontWeight: 500, fontSize: 12,
+                          color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                        }}>
+                          {item.district}
+                        </span>
+                        <span style={{
+                          fontFamily: "'JetBrains Mono',monospace", fontWeight: 600, fontSize: 12,
+                          color: historyScoreColor(item.risk_level), width: 44, textAlign: "right", flexShrink: 0,
+                        }}>
+                          {(item.flood_risk_score * 100).toFixed(1)}%
+                        </span>
+                        <span className={`history-badge ${getRiskClass(item.risk_level)}`}
+                          style={{ flexShrink: 0 }}>
+                          {item.risk_level}
+                        </span>
+                        <span style={{
+                          fontFamily: "'Inter',sans-serif", fontSize: 10, color: "var(--text-muted)",
+                          width: 50, textAlign: "right", flexShrink: 0,
+                        }}>
+                          {new Date(item.created_at).toLocaleTimeString()}
+                        </span>
+                      </div>
+                    ))
                   )}
                 </div>
-
               </div>
             </div>
           )}
@@ -949,3 +962,4 @@ export default function Home() {
     </>
   );
 }
+
