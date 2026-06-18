@@ -4,7 +4,7 @@
 ### IEEE Student Branch — University of Colombo School of Computing
 
 [![Backend](https://img.shields.io/badge/Backend-Railway-purple)](https://flood-risk-app-production.up.railway.app)
-[![Frontend](https://img.shields.io/badge/Frontend-Vercel-black)](https://flood-risk-app.vercel.app)
+[![Frontend](https://img.shields.io/badge/Frontend-Vercel-black)](https://flood-risk-app-two.vercel.app)
 [![Model](https://img.shields.io/badge/Model-CatBoost-blue)](https://catboost.ai)
 [![Score](https://img.shields.io/badge/Best%20Score-0.38114-green)](https://github.com/dinna21/Flood-Risk-App)
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
@@ -56,7 +56,7 @@ A **production-grade MLOps system** that predicts flood risk scores (0–1) for 
 
 | Component | URL |
 |-----------|-----|
-| **Frontend** | [https://flood-risk-app.vercel.app](https://flood-risk-app.vercel.app) |
+| **Frontend** | [https://flood-risk-app-two.vercel.app](https://flood-risk-app-two.vercel.app) |
 | **Backend API** | [https://flood-risk-app-production.up.railway.app](https://flood-risk-app-production.up.railway.app) |
 | **API Docs (Swagger)** | [https://flood-risk-app-production.up.railway.app/docs](https://flood-risk-app-production.up.railway.app/docs) |
 | **API Docs (ReDoc)** | [https://flood-risk-app-production.up.railway.app/redoc](https://flood-risk-app-production.up.railway.app/redoc) |
@@ -479,7 +479,7 @@ The judging criteria emphasize deployment (25%), monitoring (25%), and innovatio
 
 | Resource | URL |
 |----------|-----|
-| **Frontend** | [https://flood-risk-app.vercel.app](https://flood-risk-app.vercel.app) |
+| **Frontend** | [https://flood-risk-app-two.vercel.app](https://flood-risk-app-two.vercel.app) |
 | **Backend API** | [https://flood-risk-app-production.up.railway.app](https://flood-risk-app-production.up.railway.app) |
 | **API Docs** | [https://flood-risk-app-production.up.railway.app/docs](https://flood-risk-app-production.up.railway.app/docs) |
 | **GitHub** | [https://github.com/dinna21/Flood-Risk-App](https://github.com/dinna21/Flood-Risk-App) |
