@@ -51,18 +51,6 @@ FLOOD_KEYWORDS = [
     "water level", "heavy rain", "landslide", "cyclone",
 ]
 
-FLOOD_PRONE_DISTRICTS = [
-    "Colombo", "Gampaha", "Galle", "Matara", "Kalutara",
-    "Ratnapura", "Batticaloa",
-]
-
-# Coastal districts (also at risk during cyclones)
-COASTAL_DISTRICTS = [
-    "Colombo", "Gampaha", "Galle", "Matara", "Kalutara",
-    "Hambantota", "Batticaloa", "Ampara", "Trincomalee",
-    "Jaffna", "Mannar", "Puttalam",
-]
-
 # Monsoon-season expected rainfall estimates (mm/7-day, from Met Dept climatology)
 # SW Monsoon (May-Sep): wet in west, south, central hills. NE Monsoon (Dec-Feb): wet in east, north.
 MONSOON_RAINFALL_DEFAULTS: Dict[str, float] = {
@@ -142,6 +130,18 @@ OWM_CITY_MAP: Dict[str, str] = {
 
 OWM_BASE_URL = "https://api.openweathermap.org/data/2.5/weather"
 
+# ── Strong flood warning keywords (match actual DMC report title patterns) ───
+STRONG_KEYWORDS = [
+    "flood warning", "flood alert", "inundation warning",
+    "flash flood", "river flood", "evacuation", "overflow",
+    "spill gates", "red alert", "orange alert",
+]
+
+FLOOD_PRONE_DISTRICTS = [
+    "Ratnapura", "Kalutara", "Galle", "Matara",
+    "Batticaloa", "Kegalle", "Colombo",
+]
+
 # ══════════════════════════════════════════════════════════════════════════════
 # DMC Flood Warning Scraper
 # ══════════════════════════════════════════════════════════════════════════════
@@ -150,11 +150,10 @@ async def fetch_dmc_warnings() -> Dict[str, bool]:
     """
     Scrape DMC River Water Level & Flood Warning listing page for active warnings.
 
-    Since actual water-level data is inside PDF downloads (not parseable from the
-    listing page), this function checks:
-      1. Are any reports posted today? (indicates active monitoring)
-      2. Does any visible page text contain flood keywords?
-      3. Are any district names mentioned near flood keywords?
+    Parses ONLY the PDF title column from the reports table (not full page text).
+    Checks the 5 most recent report titles for:
+      1. Strong flood keywords (e.g. "flood warning", "flash flood")
+      2. District name aliases mentioned alongside those keywords
 
     Returns: Dict[district_name, True/False] for all 24 districts.
     """
@@ -170,46 +169,44 @@ async def fetch_dmc_warnings() -> Dict[str, bool]:
 
         soup = BeautifulSoup(response.text, "html.parser")
 
-        # Extract all visible text from the page (strips scripts, styles)
-        page_text = soup.get_text(separator=" ", strip=True).lower()
+        # Parse ONLY the <td> title column from the reports table
+        titles: List[str] = []
+        for row in soup.select("table tr"):
+            tds = row.find_all("td")
+            if tds:
+                title = tds[0].get_text(strip=True)
+                if title and len(title) > 2:
+                    titles.append(title)
 
-        # Check if any flood-related keyword appears on the page
-        has_general_warning = any(
-            kw in page_text for kw in FLOOD_KEYWORDS
-        )
-        has_cyclone = "cyclone" in page_text
+        # Check only the last 5 most recent report titles
+        recent = titles[:5]
+        combined = " ".join(recent).lower()
+        has_strong_keyword = any(kw in combined for kw in STRONG_KEYWORDS)
 
-        # Find report listing rows
-        report_rows = soup.select("table tr, .listing tr, .reports tr, .dmc-report")
-        today_str = datetime.now().strftime("%Y-%m-%d")
+        if not has_strong_keyword:
+            print(f"[DMC] No strong flood keywords in recent titles: {recent[:3]}")
+            return result
 
-        # Check if any report was posted today
-        has_today_report = today_str in page_text if report_rows else False
+        # Per-title district matching
+        any_district_matched = False
+        for title in recent:
+            title_lower = title.lower()
+            for district, aliases in DMC_DISTRICT_MATCHES.items():
+                district_in_title = any(alias in title_lower for alias in aliases)
+                flood_in_title = any(kw in title_lower for kw in STRONG_KEYWORDS)
+                if district_in_title and flood_in_title:
+                    result[district] = True
+                    any_district_matched = True
 
-        # Per-district matching: look for district names near flood keywords
-        for district, aliases in DMC_DISTRICT_MATCHES.items():
-            district_found = any(alias in page_text for alias in aliases)
-            if district_found and has_general_warning:
-                result[district] = True
+        # Fallback: strong keywords exist but no specific district → flag flood-prone
+        if not any_district_matched:
+            for d in FLOOD_PRONE_DISTRICTS:
+                result[d] = True
 
-        # Cyclone = broad trigger for wet-zone districts only (not all coastal)
-        # Uses monsoon rainfall pattern to identify actual rain-affected districts
-        if has_cyclone:
-            for d, default_mm in MONSOON_RAINFALL_DEFAULTS.items():
-                if default_mm >= 20 and not result.get(d, False):
-                    result[d] = True
-
-        # If general warning exists but no specific districts matched,
-        # flag historically flood-prone districts
-        if has_general_warning and not any(result.values()):
-            warning_active = has_today_report or has_general_warning
-            if warning_active:
-                for d in FLOOD_PRONE_DISTRICTS:
-                    result[d] = True
-
-        print(f"[DMC] Scraped successfully. General warning: {has_general_warning}, "
-              f"Today reports: {has_today_report}, "
-              f"Districts flagged: {sum(1 for v in result.values() if v)}")
+        flagged = sum(1 for v in result.values() if v)
+        print(f"[DMC] Recent titles: {recent[:3]}, "
+              f"Strong keyword: {has_strong_keyword}, "
+              f"Districts flagged: {flagged}")
 
     except httpx.HTTPError as e:
         print(f"[DMC] HTTP error: {e}")
@@ -245,10 +242,11 @@ async def _fetch_one_city(
         rain_3h = rain.get("3h")  # mm in last 3 hours
 
         # Estimate 7-day rainfall from hourly data
+        # Conservative 6-hour projection from current hourly rate, capped at 300mm
         if rain_1h is not None:
-            rainfall_7d = round(float(rain_1h) * 24 * 7, 2)
+            rainfall_7d = round(min(float(rain_1h) * 6, 300.0), 2)
         elif rain_3h is not None:
-            rainfall_7d = round(float(rain_3h) / 3 * 24 * 7, 2)
+            rainfall_7d = round(min(float(rain_3h) / 3 * 6, 300.0), 2)
         else:
             rainfall_7d = None  # No rain data available (not currently raining)
 

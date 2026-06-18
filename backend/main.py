@@ -74,6 +74,7 @@ else:
 # --- Live data cache ---------------------------------------------------------
 live_data_cache: Dict[str, dict] = {}
 last_refresh_time: Optional[datetime] = None
+last_manual_refresh_time: Optional[datetime] = None
 OWM_API_KEY = os.environ.get("OWM_API_KEY", "")
 
 # --- Refresh background data -------------------------------------------------
@@ -418,6 +419,54 @@ def stats():
 
 # --- Live Data endpoints ----------------------------------------------------
 
+# Hardcoded district risk context (from frontend district defaults + Met Dept data)
+DISTRICT_RISK_CONTEXT: Dict[str, dict] = {
+    "Colombo":       {"elevation_m": 10,  "historical_floods": 3,  "drainage_index": 0.4},
+    "Gampaha":       {"elevation_m": 15,  "historical_floods": 3,  "drainage_index": 0.4},
+    "Kandy":         {"elevation_m": 500, "historical_floods": 2,  "drainage_index": 0.5},
+    "Galle":         {"elevation_m": 5,   "historical_floods": 5,  "drainage_index": 0.3},
+    "Matara":        {"elevation_m": 5,   "historical_floods": 4,  "drainage_index": 0.3},
+    "Hambantota":    {"elevation_m": 10,  "historical_floods": 2,  "drainage_index": 0.5},
+    "Kurunegala":    {"elevation_m": 100, "historical_floods": 2,  "drainage_index": 0.5},
+    "Ratnapura":     {"elevation_m": 3,   "historical_floods": 10, "drainage_index": 0.1},
+    "Kalutara":      {"elevation_m": 5,   "historical_floods": 6,  "drainage_index": 0.2},
+    "Badulla":       {"elevation_m": 680, "historical_floods": 2,  "drainage_index": 0.5},
+    "Monaragala":    {"elevation_m": 150, "historical_floods": 2,  "drainage_index": 0.5},
+    "Polonnaruwa":   {"elevation_m": 50,  "historical_floods": 3,  "drainage_index": 0.4},
+    "Anuradhapura":  {"elevation_m": 100, "historical_floods": 1,  "drainage_index": 0.6},
+    "Trincomalee":   {"elevation_m": 10,  "historical_floods": 3,  "drainage_index": 0.4},
+    "Batticaloa":    {"elevation_m": 3,   "historical_floods": 5,  "drainage_index": 0.3},
+    "Ampara":        {"elevation_m": 30,  "historical_floods": 3,  "drainage_index": 0.4},
+    "Jaffna":        {"elevation_m": 5,   "historical_floods": 1,  "drainage_index": 0.5},
+    "Kilinochchi":   {"elevation_m": 15,  "historical_floods": 1,  "drainage_index": 0.5},
+    "Mannar":        {"elevation_m": 5,   "historical_floods": 1,  "drainage_index": 0.5},
+    "Vavuniya":      {"elevation_m": 80,  "historical_floods": 1,  "drainage_index": 0.6},
+    "Nuwara Eliya":  {"elevation_m": 1800,"historical_floods": 0,  "drainage_index": 0.8},
+    "Kegalle":       {"elevation_m": 180, "historical_floods": 3,  "drainage_index": 0.4},
+    "Matale":        {"elevation_m": 350, "historical_floods": 2,  "drainage_index": 0.5},
+    "Puttalam":      {"elevation_m": 10,  "historical_floods": 1,  "drainage_index": 0.5},
+}
+
+def _derive_risk_category(elevation: float, floods: int) -> str:
+    if elevation < 10 and floods > 5:
+        return "very_high"
+    if elevation > 500 or floods == 0:
+        return "low"
+    if elevation < 20 or floods > 3:
+        return "high"
+    return "moderate"
+
+def _enrich_with_freshness(entry: dict) -> dict:
+    age_min = (
+        (datetime.now() - last_refresh_time).total_seconds() / 60.0
+        if last_refresh_time else 999.0
+    )
+    entry["cache_age_minutes"] = round(age_min, 1)
+    entry["data_freshness"] = (
+        "fresh" if age_min < 70 else ("stale" if age_min < 180 else "very_stale")
+    )
+    return entry
+
 @app.get("/live-data")
 def get_live_data():
     age = (
@@ -433,10 +482,15 @@ def get_live_data():
         for d in live_data_cache.values()
     ) else ("unavailable" if OWM_API_KEY else "error")
 
+    enriched = {
+        district: _enrich_with_freshness(dict(entry))
+        for district, entry in live_data_cache.items()
+    }
+
     return {
-        "districts": live_data_cache,
+        "districts": enriched,
         "last_refresh": last_refresh_time.isoformat() if last_refresh_time else None,
-        "total_warnings": sum(1 for d in live_data_cache.values() if d.get("flood_warning")),
+        "total_warnings": sum(1 for d in enriched.values() if d.get("flood_warning")),
         "cache_age_seconds": round(age, 1),
         "sources_status": {
             "dmc": dmc_status if live_data_cache else "unavailable",
@@ -448,7 +502,42 @@ def get_live_data():
 def get_district_live_data(district: str):
     if district not in live_data_cache:
         raise HTTPException(status_code=404, detail=f"District '{district}' not found in live data cache")
-    return live_data_cache[district]
+    entry = dict(live_data_cache[district])
+    entry = _enrich_with_freshness(entry)
+    entry["district"] = district
+
+    ctx = DISTRICT_RISK_CONTEXT.get(district, {})
+    entry["risk_context"] = {
+        "elevation_m": ctx.get("elevation_m"),
+        "historical_floods": ctx.get("historical_floods"),
+        "drainage_index": ctx.get("drainage_index"),
+        "risk_category": _derive_risk_category(
+            ctx.get("elevation_m", 0), ctx.get("historical_floods", 0)
+        ),
+    }
+    return entry
+
+@app.post("/live-data/refresh")
+async def manual_refresh():
+    global last_manual_refresh_time
+    now = datetime.now()
+    if last_manual_refresh_time and (now - last_manual_refresh_time).total_seconds() < 300:
+        retry_after = 300 - int((now - last_manual_refresh_time).total_seconds())
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "error": "Rate limited",
+                "retry_after_seconds": retry_after,
+                "last_refresh": last_manual_refresh_time.isoformat(),
+            },
+        )
+    last_manual_refresh_time = now
+    await refresh_live_data()
+    return {
+        "status": "refreshed",
+        "timestamp": now.isoformat(),
+        "districts_updated": len(live_data_cache),
+    }
 
 # --- Pipeline & Monitoring endpoints ----------------------------------------
 
