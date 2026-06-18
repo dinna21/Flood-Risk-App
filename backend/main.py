@@ -27,7 +27,6 @@ app = FastAPI(
     title="Sri Lanka Flood Risk Prediction API",
     description="ML-powered flood risk assessment system",
     version="1.0.0",
-    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -144,6 +143,8 @@ async def lifespan(app: FastAPI):
 
     scheduler.shutdown(wait=False)
     logger.info("Scheduler shut down")
+
+app.router.lifespan_context = lifespan
 
 class PredictionInput(BaseModel):
     district: str = "Colombo"
