@@ -108,6 +108,24 @@ export default function PipelineStatus() {
     }
   };
 
+  const [cancelLoading, setCancelLoading] = useState(false);
+  const cancelRetrain = async (jobId: string) => {
+    setCancelLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/pipeline/retrain-cancel`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ job_id: jobId }),
+      });
+      const data = await res.json();
+      setRetrainResult(data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setCancelLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 384 }}>
@@ -338,17 +356,43 @@ export default function PipelineStatus() {
         {retrainResult && (
           <div style={{
             marginTop: 16, padding: 14, borderRadius: 12,
-            background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.25)",
+            background: retrainResult.status === "cancelled" ? "rgba(148,163,184,0.1)" : "rgba(34,197,94,0.1)",
+            border: retrainResult.status === "cancelled" ? "1px solid rgba(148,163,184,0.25)" : "1px solid rgba(34,197,94,0.25)",
           }}>
-            <div style={{ display: "flex", gap: 8, marginBottom: 4 }}>
-              <span style={{ ...labelS, color: "#86efac" }}>Job ID</span>
-              <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 12, color: "#86efac" }}>{retrainResult.job_id}</span>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+              <div>
+                <div style={{ display: "flex", gap: 8, marginBottom: 4 }}>
+                  <span style={{ ...labelS, color: retrainResult.status === "cancelled" ? "#94a3b8" : "#86efac" }}>Job ID</span>
+                  <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 12, color: retrainResult.status === "cancelled" ? "#94a3b8" : "#86efac" }}>{retrainResult.job_id}</span>
+                </div>
+                <div style={{ display: "flex", gap: 8, marginBottom: 4 }}>
+                  <span style={labelS}>Status</span>
+                  <span style={{
+                    fontFamily: "'Space Grotesk',sans-serif", fontSize: 12, fontWeight: 700,
+                    color: retrainResult.status === "cancelled" ? "#94a3b8" : "#86efac",
+                    textTransform: "uppercase"
+                  }}>{retrainResult.status}</span>
+                </div>
+                <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 12, color: "var(--text-secondary)", marginTop: 6 }}>{retrainResult.message}</p>
+              </div>
+              {retrainResult.status === "triggered" && (
+                <button
+                  onClick={() => cancelRetrain(retrainResult.job_id)}
+                  disabled={cancelLoading}
+                  style={{
+                    height: 30, padding: "0 14px",
+                    background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)",
+                    borderRadius: 8, color: "#fca5a5",
+                    fontFamily: "'Inter',sans-serif", fontSize: 11, fontWeight: 500,
+                    cursor: cancelLoading ? "not-allowed" : "pointer",
+                    whiteSpace: "nowrap", flexShrink: 0,
+                    opacity: cancelLoading ? 0.5 : 1,
+                  }}
+                >
+                  {cancelLoading ? "..." : "\u2716 Cancel"}
+                </button>
+              )}
             </div>
-            <div style={{ display: "flex", gap: 8, marginBottom: 4 }}>
-              <span style={labelS}>Status</span>
-              <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 12, fontWeight: 700, color: "#86efac", textTransform: "uppercase" }}>{retrainResult.status}</span>
-            </div>
-            <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 12, color: "var(--text-secondary)", marginTop: 6 }}>{retrainResult.message}</p>
           </div>
         )}
         <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 11, color: "var(--text-muted)", marginTop: 10 }}>

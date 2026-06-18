@@ -455,3 +455,21 @@ def pipeline_retrain_trigger(req: RetrainRequest):
         except Exception as e:
             logger.error(f"Failed to log retrain trigger: {e}")
     return trigger_data
+
+class CancelRetrainRequest(BaseModel):
+    job_id: str
+
+@app.post("/pipeline/retrain-cancel")
+def pipeline_retrain_cancel(req: CancelRetrainRequest):
+    timestamp = datetime.now().isoformat()
+    if supabase:
+        try:
+            supabase.table("retrain_logs").update({"status": "cancelled"}).eq("job_id", req.job_id).execute()
+        except Exception as e:
+            logger.error(f"Failed to cancel retrain job: {e}")
+    return {
+        "job_id": req.job_id,
+        "status": "cancelled",
+        "cancelled_at": timestamp,
+        "message": "Retraining job cancelled successfully.",
+    }

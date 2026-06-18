@@ -17,25 +17,33 @@ interface Toast {
 }
 
 export default function AlertSystem({
-  onAlertCount
+  onAlertCount,
+  onAlertClick
 }: {
   onAlertCount?: (count: number) => void;
+  onAlertClick?: (district: string) => void;
 }) {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [showPanel, setShowPanel] = useState(false);
   const dismissedRef = useRef<Set<number>>(new Set());
   const toastIdRef = useRef(0);
+  const errorCountRef = useRef(0);
 
   const fetchAlerts = useCallback(async () => {
     try {
       const res = await fetch(`${API_URL}/history`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       const allRisk = (data.predictions || []) as Alert[];
       setAlerts(allRisk);
+      errorCountRef.current = 0;
       if (onAlertCount) onAlertCount(allRisk.filter((p) => p.flood_risk_score >= 0.5).length);
     } catch (e) {
-      console.error(e);
+      errorCountRef.current++;
+      if (errorCountRef.current <= 1 || errorCountRef.current % 5 === 0) {
+        console.error("Alert fetch failed:", e);
+      }
     }
   }, [onAlertCount]);
 
@@ -85,6 +93,10 @@ export default function AlertSystem({
             <div
               key={t.alert.id}
               className="toast-enter"
+              onClick={() => {
+                dismissToast(t.alert.id);
+                if (onAlertClick) onAlertClick(t.alert.district);
+              }}
               style={{
                 background: s.bg,
                 border: `1px solid ${s.border}`,
@@ -92,6 +104,7 @@ export default function AlertSystem({
                 padding: "10px 14px",
                 boxShadow: "0 4px 20px rgba(0,0,0,0.5)",
                 display: "flex", alignItems: "center", gap: 10,
+                cursor: "pointer",
                 animation: "toastIn 0.3s ease forwards",
                 pointerEvents: "auto",
               }}
@@ -112,7 +125,7 @@ export default function AlertSystem({
                 </span>
               </div>
               <button
-                onClick={() => dismissToast(t.alert.id)}
+                onClick={(e) => { e.stopPropagation(); dismissToast(t.alert.id); }}
                 style={{
                   background: "none", border: "none", color: s.text,
                   cursor: "pointer", fontSize: 16, lineHeight: 1, padding: "0 2px", flexShrink: 0,
@@ -153,11 +166,23 @@ export default function AlertSystem({
                 {alerts.slice().reverse().slice(0, 20).map((a) => {
                   const s = getLevelStyles(a.risk_level);
                   return (
-                    <div key={a.id} style={{
+                    <div key={a.id} onClick={() => {
+                      setShowPanel(false);
+                      if (onAlertClick) onAlertClick(a.district);
+                    }} style={{
                       background: "var(--glass)", border: "1px solid var(--glass-border)",
                       borderRadius: 10, padding: "8px 12px",
                       display: "flex", alignItems: "center", gap: 10,
-                    }}>
+                      cursor: "pointer",
+                      transition: "background 150ms ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLElement).style.background = "rgba(100,200,255,0.08)";
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLElement).style.background = "var(--glass)";
+                    }}
+                    >
                       <span style={{
                         width: 6, height: 6, borderRadius: "50%",
                         background: s.dot, flexShrink: 0,
