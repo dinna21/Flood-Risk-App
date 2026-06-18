@@ -63,6 +63,50 @@ COASTAL_DISTRICTS = [
     "Jaffna", "Mannar", "Puttalam",
 ]
 
+# Monsoon-season expected rainfall estimates (mm/7-day, from Met Dept climatology)
+# SW Monsoon (May-Sep): wet in west, south, central hills. NE Monsoon (Dec-Feb): wet in east, north.
+MONSOON_RAINFALL_DEFAULTS: Dict[str, float] = {
+    # Southwest monsoon (current: June) — wet zone districts
+    "Colombo":      45.0,
+    "Gampaha":      40.0,
+    "Kandy":        35.0,
+    "Galle":        50.0,
+    "Matara":       45.0,
+    "Kalutara":     50.0,
+    "Ratnapura":    55.0,
+    "Kegalle":      40.0,
+    "Nuwara Eliya": 35.0,
+    "Badulla":      30.0,
+    "Monaragala":   25.0,
+    # Intermediate zone — moderate rain
+    "Kurunegala":   25.0,
+    "Matale":       25.0,
+    "Polonnaruwa":  20.0,
+    "Ampara":       20.0,
+    "Batticaloa":   20.0,
+    "Trincomalee":  15.0,
+    # Dry zone — minimal rain during SW monsoon
+    "Hambantota":    15.0,
+    "Anuradhapura":  15.0,
+    "Jaffna":        10.0,
+    "Kilinochchi":   10.0,
+    "Mannar":        10.0,
+    "Vavuniya":      15.0,
+    "Puttalam":      20.0,
+    "Mullaitivu":    10.0,
+}
+
+# Map Sinhala weather terms to Met Dept rainfall categories (mm/day)
+WEATHER_CATEGORIES: Dict[str, float] = {
+    "light": 6.0, "light rain": 6.0, "සිහින් වැසි": 6.0,
+    "light to moderate": 18.0, "සිහින් හෝ මද": 18.0,
+    "moderate": 35.0, "මද වැසි": 35.0,
+    "fairly heavy": 75.0, "තරමක් තද": 75.0,
+    "heavy": 125.0, "තද වැසි": 125.0,
+    "very heavy": 175.0, "ඉතා තද": 175.0,
+    "showers": 12.0, "thundershowers": 15.0,
+}
+
 # DMC report listing URLs (Joomla CMS)
 DMC_RIVER_WATER_URL = (
     "https://www.dmc.gov.lk/index.php"
