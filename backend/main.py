@@ -14,7 +14,7 @@ from supabase import create_client, Client
 import logging
 import time
 from contextlib import asynccontextmanager
-from live_data import fetch_dmc_warnings, fetch_owm_rainfall
+from live_data import fetch_dmc_warnings, fetch_owm_rainfall, MONSOON_RAINFALL_DEFAULTS
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
@@ -101,11 +101,19 @@ async def refresh_live_data():
                 entry["weather_desc"] = owm["weather_desc"]
                 entry["weather_main"] = owm["weather_main"]
                 entry["sources"]["owm"] = "ok"
+                entry["rainfall_source"] = "owm" if owm["rainfall_7d_mm"] is not None else "none"
             else:
                 if not owm_ok:
                     entry["sources"]["owm"] = "error"
                 else:
                     entry["sources"]["owm"] = "unavailable"
+
+            # Fallback: monsoon-season estimate when no live rain data
+            if entry.get("rainfall_7d_mm") is None:
+                monsoon_est = MONSOON_RAINFALL_DEFAULTS.get(district)
+                if monsoon_est is not None:
+                    entry["rainfall_7d_mm"] = monsoon_est
+                    entry["rainfall_source"] = "monsoon_estimate"
 
             entry["last_updated"] = datetime.now().isoformat()
             live_data_cache[district] = entry
