@@ -773,27 +773,6 @@ export default function Home() {
                             </span>
                           </div>
                         </div>
-                        {result.live_data_applied && (
-                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8,
-                            padding: "5px 10px", background: "rgba(34,197,94,0.1)",
-                            border: "1px solid rgba(34,197,94,0.25)", borderRadius: 6, width: "fit-content" }}>
-                            <CheckCircle2 size={11} strokeWidth={2} style={{ color: "var(--risk-low)" }} />
-                            <span style={{ fontFamily: "'Inter',sans-serif", fontSize: 10, color: "#86efac", fontWeight: 500 }}>
-                              Live data applied
-                            </span>
-                          </div>
-                        )}
-                        {result.live_data_applied && result.live_data_overrides && (
-                          <div className="live-override-note">
-                            <Zap size={10} color="var(--accent)" />
-                            <span>
-                              {result.live_data_overrides.rainfall_7d_mm != null &&
-                                `Rainfall ${result.live_data_overrides.rainfall_7d_mm}mm`}
-                              {result.live_data_overrides.flood_warning &&
-                                `${result.live_data_overrides.rainfall_7d_mm != null ? ' | ' : ''}Flood warning active`}
-                            </span>
-                          </div>
-                        )}
                       </>
                     ) : loading ? (
                       <>
