@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from catboost import CatBoostRegressor
 from pathlib import Path
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Dict
 import pandas as pd
 import numpy as np
 import json
@@ -14,6 +14,9 @@ from supabase import create_client, Client
 import logging
 import time
 from contextlib import asynccontextmanager
+from live_data import fetch_dmc_warnings, fetch_owm_rainfall
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.interval import IntervalTrigger
 
 load_dotenv()
 
@@ -23,7 +26,8 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title="Sri Lanka Flood Risk Prediction API",
     description="ML-powered flood risk assessment system",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -68,12 +72,78 @@ else:
     supabase = None
     print("WARNING: SUPABASE_URL/SUPABASE_ANON_KEY not set. Logging disabled.")
 
-@app.on_event("startup")
-async def startup_event():
+# --- Live data cache ---------------------------------------------------------
+live_data_cache: Dict[str, dict] = {}
+last_refresh_time: Optional[datetime] = None
+OWM_API_KEY = os.environ.get("OWM_API_KEY", "")
+
+# --- Refresh background data -------------------------------------------------
+async def refresh_live_data():
+    global live_data_cache, last_refresh_time
+    try:
+        print("[LiveData] Starting refresh cycle...")
+        dmc_warnings = await fetch_dmc_warnings()
+        owm_data = await fetch_owm_rainfall(OWM_API_KEY)
+
+        dmc_ok = any(dmc_warnings.values()) or True  # dmc_warnings always returns something
+        owm_ok = any(v is not None for v in owm_data.values())
+
+        for district in dmc_warnings:
+            entry = live_data_cache.get(district, {})
+            entry["flood_warning"] = dmc_warnings.get(district, False)
+            entry["sources"] = entry.get("sources", {})
+            entry["sources"]["dmc"] = "ok"
+
+            owm = owm_data.get(district)
+            if owm is not None:
+                entry["rainfall_7d_mm"] = owm["rainfall_7d_mm"]
+                entry["temperature_c"] = owm["temperature_c"]
+                entry["humidity_pct"] = owm["humidity_pct"]
+                entry["weather_desc"] = owm["weather_desc"]
+                entry["weather_main"] = owm["weather_main"]
+                entry["sources"]["owm"] = "ok"
+            else:
+                if not owm_ok:
+                    entry["sources"]["owm"] = "error"
+                else:
+                    entry["sources"]["owm"] = "unavailable"
+
+            entry["last_updated"] = datetime.now().isoformat()
+            live_data_cache[district] = entry
+
+        last_refresh_time = datetime.now()
+        warnings_count = sum(1 for d in live_data_cache.values() if d.get("flood_warning"))
+        print(f"[LiveData] Refresh complete. Cache size: {len(live_data_cache)}, "
+              f"Active warnings: {warnings_count}, DMC: ok, OWM: {'ok' if owm_ok else 'error'}")
+
+    except Exception as e:
+        print(f"[LiveData] Refresh failed (will retry next cycle): {e}")
+
+
+# --- Lifespan (replaces deprecated @app.on_event("startup")) -----------------
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     logger.info("Starting Flood Risk API...")
     logger.info(f"Model loaded: flood_model.cbm")
     logger.info(f"Features: {len(FEATURES)}")
+    if OWM_API_KEY:
+        logger.info("OWM_API_KEY configured — live weather data enabled")
+    else:
+        logger.info("OWM_API_KEY not set — live weather data disabled")
+
+    scheduler = AsyncIOScheduler()
+    scheduler.add_job(refresh_live_data, IntervalTrigger(minutes=60))
+    scheduler.start()
+    logger.info("Live data scheduler started (60-min interval)")
+
+    await refresh_live_data()
+    logger.info("Initial live data cache populated")
     logger.info("API ready to serve predictions")
+
+    yield
+
+    scheduler.shutdown(wait=False)
+    logger.info("Scheduler shut down")
 
 class PredictionInput(BaseModel):
     district: str = "Colombo"
@@ -108,6 +178,7 @@ class PredictionInput(BaseModel):
     terrain_roughness_index: Optional[float] = 0.5
     socioeconomic_status_index: Optional[float] = 0.5
     extreme_weather_index: Optional[float] = 0.5
+    use_live_data: bool = False
 
 def get_risk_level(score: float) -> str:
     if score < 0.3:  return "Low"
@@ -198,6 +269,21 @@ def health():
 def predict(data: PredictionInput):
     try:
         row = data.model_dump()
+
+        # --- Live data overrides ---
+        live_overrides = {}
+        if data.use_live_data and data.district in live_data_cache:
+            ld = live_data_cache[data.district]
+            if ld.get("flood_warning"):
+                row["flood_occurrence_current_event"] = "Yes"
+                live_overrides["flood_warning"] = True
+            else:
+                row["flood_occurrence_current_event"] = "No"
+                live_overrides["flood_warning"] = False
+            if ld.get("rainfall_7d_mm") is not None:
+                row["rainfall_7d_mm"] = ld["rainfall_7d_mm"]
+                live_overrides["rainfall_7d_mm"] = ld["rainfall_7d_mm"]
+
         df  = pd.DataFrame([row])
 
         # Fill categorical missing
@@ -262,7 +348,7 @@ def predict(data: PredictionInput):
             except Exception as db_err:
                 print(f"DB logging error: {db_err}")
 
-        return {
+        response_data = {
             "flood_risk_score": round(score, 4),
             "risk_level":       level,
             "risk_color":       color,
@@ -270,6 +356,11 @@ def predict(data: PredictionInput):
             "message":          message,
             "timestamp":        datetime.now().isoformat(),
         }
+        if live_overrides:
+            response_data["live_data_applied"] = True
+            response_data["live_data_overrides"] = live_overrides
+
+        return response_data
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -315,6 +406,42 @@ def stats():
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# --- Live Data endpoints ----------------------------------------------------
+
+@app.get("/live-data")
+def get_live_data():
+    age = (
+        (datetime.now() - last_refresh_time).total_seconds()
+        if last_refresh_time else -1
+    )
+    dmc_status = "ok" if any(
+        d.get("sources", {}).get("dmc") == "ok"
+        for d in live_data_cache.values()
+    ) else "error"
+    owm_status = "ok" if any(
+        d.get("sources", {}).get("owm") == "ok"
+        for d in live_data_cache.values()
+    ) else ("unavailable" if OWM_API_KEY else "error")
+
+    return {
+        "districts": live_data_cache,
+        "last_refresh": last_refresh_time.isoformat() if last_refresh_time else None,
+        "total_warnings": sum(1 for d in live_data_cache.values() if d.get("flood_warning")),
+        "cache_age_seconds": round(age, 1),
+        "sources_status": {
+            "dmc": dmc_status if live_data_cache else "unavailable",
+            "owm": owm_status if live_data_cache else "unavailable",
+        },
+    }
+
+@app.get("/live-data/{district}")
+def get_district_live_data(district: str):
+    if district not in live_data_cache:
+        raise HTTPException(status_code=404, detail=f"District '{district}' not found in live data cache")
+    return live_data_cache[district]
+
+# --- Pipeline & Monitoring endpoints ----------------------------------------
 
 @app.get("/pipeline/status")
 def pipeline_status():
