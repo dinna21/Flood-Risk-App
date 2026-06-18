@@ -11,6 +11,7 @@ interface DistrictLiveData {
   weather_desc: string | null;
   weather_main: string | null;
   last_updated: string | null;
+  rainfall_source?: string;
   sources: {
     dmc: string;
     owm: string;
@@ -284,6 +285,12 @@ export default function LiveDataPanel() {
                     fontWeight: 500, color: getRainfallColor(d?.rainfall_7d_mm ?? null),
                   }}>
                     {d?.rainfall_7d_mm !== null ? `${d?.rainfall_7d_mm} mm` : "--"}
+                    {d?.rainfall_source === "monsoon_estimate" && (
+                      <span style={{
+                        fontFamily: "'Inter',sans-serif", fontSize: 9,
+                        color: "var(--text-muted)", marginLeft: 3,
+                      }}>(est.)</span>
+                    )}
                   </span>
                 </div>
 
@@ -344,7 +351,7 @@ export default function LiveDataPanel() {
           lineHeight: 1.5,
         }}>
           DMC data scraped from dmc.gov.lk every 60 minutes.
-          Rainfall from OpenWeatherMap API.
+          Rainfall from OpenWeatherMap API; "(est.)" = monsoon climatology estimate.
           If sources are unavailable, predictions use form defaults.
         </p>
       </div>
