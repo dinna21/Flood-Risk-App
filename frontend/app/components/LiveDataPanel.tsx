@@ -5,6 +5,7 @@ import {
   ArrowRight,
   CheckCircle2,
   Clock,
+  Crosshair,
   Radio,
   RefreshCw,
 } from "./Icons";
@@ -275,9 +276,10 @@ export default function LiveDataPanel() {
   const isVeryStale = cacheAge >= 10800;
 
   const dmcLabel =
-    sourcesStatus.dmc === "ok" ? "Active" :
+    sourcesStatus.dmc === "ok" && totalWarnings > 0 ? "Warnings active" :
+    sourcesStatus.dmc === "ok" && totalWarnings === 0 ? "No warnings" :
     sourcesStatus.dmc === "error" ? "Unreachable" :
-    "No warnings posted";
+    "Not configured";
   const owmLabel =
     sourcesStatus.owm === "ok" ? "Live weather" :
     sourcesStatus.owm === "error" ? "API error" :
@@ -328,24 +330,28 @@ export default function LiveDataPanel() {
               onClick={manualRefresh}
               disabled={refreshing}
               style={{
-                background: "rgba(58,96,128,0.25)", border: "1px solid var(--glass-border)",
-                borderRadius: 8, color:
-                  refreshStatus === "success" ? "var(--risk-low)" :
-                  refreshStatus === "fail" ? "var(--risk-high)" :
-                  refreshStatus === "ratelimited" ? "var(--risk-moderate)" :
-                  "var(--text-secondary)",
-                fontFamily: "'Inter',sans-serif", fontSize: 11,
-                padding: "4px 12px", cursor: refreshing ? "not-allowed" : "pointer",
+                background: "rgba(56,182,255,0.06)", border: "1px solid rgba(56,182,255,0.3)",
+                borderRadius: 8, color: "var(--accent)",
+                fontFamily: "'Inter',sans-serif", fontSize: 12, fontWeight: 500,
+                padding: "5px 14px", cursor: refreshing ? "not-allowed" : "pointer",
                 opacity: refreshing ? 0.6 : 1, whiteSpace: "nowrap",
               }}
             >
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><RefreshCw size={13} strokeWidth={1.75} style={refreshing ? { animation: "spin 0.9s linear infinite" } : undefined} />{refreshing ? "Refreshing..." : refreshBtnLabel}</span>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><RefreshCw size={13} strokeWidth={1.75} style={refreshing ? { animation: "spin 0.9s linear infinite" } : undefined} />{refreshBtnLabel}</span>
             </button>
           </div>
         </div>
         <div className="live-progress-bar" style={{ marginBottom: 0 }}>
           <div className="live-progress-bar-fill" style={{ width: `${progressPercent}%` }} />
         </div>
+      </div>
+
+      <div className="live-context-bar">
+        <Crosshair size={12} strokeWidth={1.75} />
+        <span>
+          <span style={{ color: "var(--text-secondary)", fontWeight: 600 }}>Data automatically feeds Predict</span>
+          {" "}— rainfall and flood warnings update every prediction in real time
+        </span>
       </div>
 
       {/* SECTION B — Warning Banner */}

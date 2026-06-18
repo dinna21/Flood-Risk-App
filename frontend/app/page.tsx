@@ -288,7 +288,6 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState("predict");
   const [alertCount, setAlertCount] = useState(0);
   const [showNotifPanel, setShowNotifPanel] = useState(false);
-  const [useLiveData, setUseLiveData] = useState(false);
 
   useEffect(() => {
     fetchHistory();
@@ -297,9 +296,8 @@ export default function Home() {
 
   useEffect(() => {
     const handler = (e: Event) => {
-      const { district, useLiveData } = (e as CustomEvent).detail;
+      const { district } = (e as CustomEvent).detail;
       setActiveTab("predict");
-      setUseLiveData(useLiveData ?? false);
       const defaults = DISTRICT_DEFAULTS[district];
       if (defaults) {
         setForm((prev) => ({
@@ -345,7 +343,7 @@ export default function Home() {
       const res = await fetch(`${API_URL}/predict`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, use_live_data: useLiveData }),
+        body: JSON.stringify({ ...form, use_live_data: true }),
       });
       if (!res.ok) throw new Error("Prediction failed");
       const data = await res.json();
@@ -716,44 +714,12 @@ export default function Home() {
                       </div>
                     </div>
                   </div>
-                </div>{/* end form-content */}
-
-                {/* Live data toggle */}
-                <div className="live-toggle-row">
-                  <Radio size={14} strokeWidth={1.75} style={{ color: "var(--accent)", flexShrink: 0 }} />
-                  <div style={{ flex: 1 }}>
-                    <div style={{
-                      fontFamily: "'Inter',sans-serif", fontSize: 13,
-                      fontWeight: 500, color: "var(--text-primary)",
-                    }}>
-                      Use Live Data
-                    </div>
-                    <div style={{
-                      fontFamily: "'Inter',sans-serif", fontSize: 10,
-                      color: "var(--text-muted)", marginTop: 1,
-                    }}>
-                      Syncs flood warnings & rainfall from live sources
-                    </div>
-                  </div>
-                  <label className="toggle-switch">
-                    <input
-                      type="checkbox"
-                      checked={useLiveData}
-                      onChange={(e) => setUseLiveData(e.target.checked)}
-                    />
-                    <span className="toggle-slider" />
-                  </label>
                 </div>
-                {useLiveData && (
-                  <div style={{
-                    background: "rgba(56,182,255,0.1)", border: "1px solid rgba(56,182,255,0.2)",
-                    borderRadius: 8, padding: "6px 12px",
-                    fontFamily: "'Inter',sans-serif", fontSize: 10,
-                    color: "var(--accent)", textAlign: "center",
-                  }}>
-                    Live data will override flood event status and rainfall
-                  </div>
-                )}
+
+                <div className="live-feed-indicator">
+                  <span className="live-feed-dot" />
+                  <span>Live data active</span>
+                </div>
 
                 <button
                   id="predict-btn"
@@ -812,6 +778,17 @@ export default function Home() {
                             <CheckCircle2 size={11} strokeWidth={2} style={{ color: "var(--risk-low)" }} />
                             <span style={{ fontFamily: "'Inter',sans-serif", fontSize: 10, color: "#86efac", fontWeight: 500 }}>
                               Live data applied
+                            </span>
+                          </div>
+                        )}
+                        {result.live_data_applied && result.live_data_overrides && (
+                          <div className="live-override-note">
+                            <Zap size={10} color="var(--accent)" />
+                            <span>
+                              {result.live_data_overrides.rainfall_7d_mm != null &&
+                                `Rainfall ${result.live_data_overrides.rainfall_7d_mm}mm`}
+                              {result.live_data_overrides.flood_warning &&
+                                `${result.live_data_overrides.rainfall_7d_mm != null ? ' | ' : ''}Flood warning active`}
                             </span>
                           </div>
                         )}
