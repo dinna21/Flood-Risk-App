@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, BarChart, Bar,
@@ -32,6 +32,7 @@ export default function MonitoringDashboard() {
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState("");
+  const errCount = useRef(0);
 
   useEffect(() => {
     fetchData();
@@ -42,11 +43,16 @@ export default function MonitoringDashboard() {
   const fetchData = async () => {
     try {
       const res = await fetch(`${API_URL}/history`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setPredictions(data.predictions || []);
       setLastUpdate(new Date().toLocaleTimeString());
+      errCount.current = 0;
     } catch (e) {
-      console.error(e);
+      errCount.current++;
+      if (errCount.current <= 1 || errCount.current % 5 === 0) {
+        console.error("Monitoring fetch failed:", e);
+      }
     } finally {
       setLoading(false);
     }
