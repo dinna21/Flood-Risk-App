@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import MonitoringDashboard from "./components/MonitoringDashboard";
+import PipelineStatus from "./components/PipelineStatus";
 import AlertSystem from "./components/AlertSystem";
 
 /* Leaflet map must be client-only (no SSR) */
@@ -173,9 +174,10 @@ function RiskRing({ score, color }: { score: number; color: string }) {
 
 /* ─── Tab definitions ────────────────────────────────────────────── */
 const TABS = [
-  { id: "predict", label: "Predict"    },
-  { id: "map",     label: "Risk Map"   },
-  { id: "monitor", label: "Monitoring" },
+  { id: "predict",  label: "Predict"     },
+  { id: "map",      label: "Risk Map"    },
+  { id: "monitor",  label: "Monitoring"  },
+  { id: "pipeline", label: "\u2699\uFE0F Pipeline" },
 ];
 
 /* ─── District auto-population defaults ─────────────────────────── */
@@ -354,7 +356,25 @@ export default function Home() {
       <div className="orb orb-5" aria-hidden="true" />
 
       {/* High-risk alert toasts */}
-      <AlertSystem onAlertCount={setAlertCount} />
+      <AlertSystem onAlertCount={setAlertCount} onAlertClick={(district) => {
+        setActiveTab("predict");
+        setShowNotifPanel(false);
+        const defaults = DISTRICT_DEFAULTS[district];
+        if (defaults) {
+          setForm((prev) => ({
+            ...prev,
+            district,
+            elevation_m: defaults.elevation,
+            rainfall_7d_mm: defaults.rainfall,
+            monthly_rainfall_mm: defaults.monthly,
+            distance_to_river_m: defaults.riverDist,
+            historical_flood_count: defaults.floodCount,
+            drainage_index: defaults.drainage,
+            flood_occurrence_current_event: defaults.floodEvent,
+            water_presence_flag: defaults.waterPresence,
+          }));
+        }
+      }} />
 
       {/* ── Page shell: full-viewport grid, header + scrollable body ── */}
       <div style={{
@@ -794,6 +814,9 @@ export default function Home() {
               <MonitoringDashboard />
             </div>
           )}
+
+          {/* ── PIPELINE TAB ── */}
+          {activeTab === "pipeline" && <PipelineStatus />}
 
         </main>
 

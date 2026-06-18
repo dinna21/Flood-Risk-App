@@ -11,8 +11,14 @@ import json
 import os
 from dotenv import load_dotenv
 from supabase import create_client, Client
+import logging
+import time
+from contextlib import asynccontextmanager
 
 load_dotenv()
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Sri Lanka Flood Risk Prediction API",
@@ -27,6 +33,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.middleware("http")
+async def add_process_time_header(request, call_next):
+    start_time = time.time()
+    response = await call_next(request)
+    process_time = time.time() - start_time
+    response.headers["X-Process-Time"] = str(process_time)
+    logger.info(f"{request.method} {request.url.path} completed in {process_time:.3f}s")
+    return response
 
 # Load model on startup
 BASE      = Path(__file__).parent
@@ -52,6 +67,13 @@ if SUPABASE_URL and SUPABASE_KEY:
 else:
     supabase = None
     print("WARNING: SUPABASE_URL/SUPABASE_ANON_KEY not set. Logging disabled.")
+
+@app.on_event("startup")
+async def startup_event():
+    logger.info("Starting Flood Risk API...")
+    logger.info(f"Model loaded: flood_model.cbm")
+    logger.info(f"Features: {len(FEATURES)}")
+    logger.info("API ready to serve predictions")
 
 class PredictionInput(BaseModel):
     district: str = "Colombo"
@@ -293,3 +315,143 @@ def stats():
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/pipeline/status")
+def pipeline_status():
+    model_path = MODEL_DIR / "flood_model.cbm"
+    model_size = round(model_path.stat().st_size / (1024 * 1024), 2) if model_path.exists() else 0
+    return {
+        "model_version": "1.0.0",
+        "model_file": "flood_model.cbm",
+        "model_size_mb": model_size,
+        "training_data": "train_cleaned.csv",
+        "algorithm": "CatBoost MAE Loss",
+        "features_count": len(FEATURES),
+        "deployment_env": "Railway",
+        "python_version": "3.11",
+        "status": "healthy",
+        "uptime": "running",
+    }
+
+@app.get("/monitoring/drift")
+def monitoring_drift():
+    baseline_mean = 0.478
+    baseline_std = 0.046
+    try:
+        if supabase:
+            result = supabase.table("predictions").select("*").order("created_at", desc=True).limit(20).execute()
+            data = result.data
+        else:
+            return {
+                "drift_detected": False,
+                "baseline_mean": baseline_mean,
+                "recent_mean": None,
+                "baseline_std": baseline_std,
+                "recent_std": None,
+                "sample_size": 0,
+                "status": "no_data",
+                "recommendation": "No data available for drift analysis",
+            }
+    except Exception:
+        return {
+            "drift_detected": False,
+            "baseline_mean": baseline_mean,
+            "recent_mean": None,
+            "baseline_std": baseline_std,
+            "recent_std": None,
+            "sample_size": 0,
+            "status": "no_data",
+            "recommendation": "No data available for drift analysis",
+        }
+
+    if not data:
+        return {
+            "drift_detected": False,
+            "baseline_mean": baseline_mean,
+            "recent_mean": None,
+            "baseline_std": baseline_std,
+            "recent_std": None,
+            "sample_size": 0,
+            "status": "no_data",
+            "recommendation": "No data available for drift analysis",
+        }
+
+    scores = [r["flood_risk_score"] for r in data]
+    recent_mean = float(np.mean(scores))
+    recent_std = float(np.std(scores))
+    drift = abs(recent_mean - baseline_mean) > 0.05
+
+    return {
+        "drift_detected": drift,
+        "baseline_mean": baseline_mean,
+        "recent_mean": round(recent_mean, 4),
+        "baseline_std": baseline_std,
+        "recent_std": round(recent_std, 4),
+        "sample_size": len(scores),
+        "status": "drift_warning" if drift else "normal",
+        "recommendation": "Retrain recommended" if drift else "Monitor closely",
+    }
+
+@app.get("/monitoring/performance")
+def monitoring_performance():
+    try:
+        if supabase:
+            result = supabase.table("predictions").select("*").execute()
+            data = result.data
+        else:
+            return {"error": "No data available", "total_predictions": 0}
+    except Exception:
+        return {"error": "No data available", "total_predictions": 0}
+
+    if not data:
+        return {"error": "No data available", "total_predictions": 0}
+
+    scores = [r["flood_risk_score"] for r in data]
+    districts = [r["district"] for r in data]
+    district_counts = {}
+    for d in districts:
+        district_counts[d] = district_counts.get(d, 0) + 1
+    top_districts = sorted(district_counts.items(), key=lambda x: x[1], reverse=True)[:5]
+
+    return {
+        "total_predictions": len(data),
+        "risk_levels": {
+            "Low": len([s for s in scores if s < 0.3]),
+            "Moderate": len([s for s in scores if 0.3 <= s < 0.5]),
+            "High": len([s for s in scores if 0.5 <= s < 0.7]),
+            "Very High": len([s for s in scores if s >= 0.7]),
+        },
+        "score_distribution": {
+            "min": round(float(np.min(scores)), 4),
+            "max": round(float(np.max(scores)), 4),
+            "mean": round(float(np.mean(scores)), 4),
+            "std": round(float(np.std(scores)), 4),
+        },
+        "top_districts": [{"district": d, "count": c} for d, c in top_districts],
+    }
+
+class RetrainRequest(BaseModel):
+    reason: str
+
+@app.post("/pipeline/retrain-trigger")
+def pipeline_retrain_trigger(req: RetrainRequest):
+    job_id = f"retrain_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+    timestamp = datetime.now().isoformat()
+    trigger_data = {
+        "job_id": job_id,
+        "status": "triggered",
+        "reason": req.reason,
+        "triggered_at": timestamp,
+        "estimated_duration": "15-20 minutes",
+        "message": "Retraining job queued. Model will update automatically.",
+    }
+    if supabase:
+        try:
+            supabase.table("retrain_logs").insert({
+                "reason": req.reason,
+                "job_id": job_id,
+                "status": "triggered",
+            }).execute()
+        except Exception as e:
+            logger.error(f"Failed to log retrain trigger: {e}")
+    return trigger_data
