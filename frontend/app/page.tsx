@@ -269,6 +269,31 @@ export default function Home() {
     fetchStats();
   }, []);
 
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { district, useLiveData } = (e as CustomEvent).detail;
+      setActiveTab("predict");
+      setUseLiveData(useLiveData ?? false);
+      const defaults = DISTRICT_DEFAULTS[district];
+      if (defaults) {
+        setForm((prev) => ({
+          ...prev,
+          district,
+          elevation_m: defaults.elevation,
+          rainfall_7d_mm: defaults.rainfall,
+          monthly_rainfall_mm: defaults.monthly,
+          distance_to_river_m: defaults.riverDist,
+          historical_flood_count: defaults.floodCount,
+          drainage_index: defaults.drainage,
+          flood_occurrence_current_event: defaults.floodEvent,
+          water_presence_flag: defaults.waterPresence,
+        }));
+      }
+    };
+    window.addEventListener("selectDistrict", handler);
+    return () => window.removeEventListener("selectDistrict", handler);
+  }, []);
+
   /* ── API calls (unchanged) ── */
   const fetchHistory = async () => {
     try {
@@ -479,6 +504,9 @@ export default function Home() {
                 }}
               >
                 {tab.label}
+                {tab.id === "live" && (
+                  <span className="live-tab-dot" title="Live updating content" />
+                )}
               </button>
             );
           })}
@@ -818,6 +846,11 @@ export default function Home() {
                                 {" | Rain: "}{result.live_data_overrides.rainfall_7d_mm.toFixed(1)}mm
                               </span>
                             )}
+                          </div>
+                        )}
+                        {result.live_data_applied && (
+                          <div className="live-powered-pill" style={{ marginTop: 8 }}>
+                            {"⚡"} Powered by live data
                           </div>
                         )}
                       </div>
