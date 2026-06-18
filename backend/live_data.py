@@ -192,10 +192,11 @@ async def fetch_dmc_warnings() -> Dict[str, bool]:
             if district_found and has_general_warning:
                 result[district] = True
 
-        # Cyclone = broad trigger: flag all coastal districts
+        # Cyclone = broad trigger for wet-zone districts only (not all coastal)
+        # Uses monsoon rainfall pattern to identify actual rain-affected districts
         if has_cyclone:
-            for d in COASTAL_DISTRICTS:
-                if not result[d]:
+            for d, default_mm in MONSOON_RAINFALL_DEFAULTS.items():
+                if default_mm >= 20 and not result.get(d, False):
                     result[d] = True
 
         # If general warning exists but no specific districts matched,
