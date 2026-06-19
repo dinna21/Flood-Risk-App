@@ -93,10 +93,10 @@ function SourceDot({ status }: { status: string }) {
 
 function getRainfallColor(mm: number | null): string {
   if (mm === null) return "var(--text-muted)";
-  if (mm > 250) return "var(--risk-high)";
-  if (mm > 150) return "var(--risk-moderate)";
-  if (mm < 15) return "var(--risk-low)";
-  return "var(--text-secondary)";
+  if (mm >= 80) return "#f87171";
+  if (mm >= 40) return "#fb923c";
+  if (mm >= 20) return "#facc15";
+  return "#4ade80";
 }
 
 function FreshnessDot({ freshness, ageMinutes }: { freshness?: string; ageMinutes?: number }) {
@@ -275,6 +275,9 @@ export default function LiveDataPanel() {
   const isStale = cacheAge >= 4200 && cacheAge < 10800; // 70-180 min
   const isVeryStale = cacheAge >= 10800;
 
+  const heavyRainCount = DISTRICT_ORDER.filter(d => (districts[d]?.rainfall_7d_mm ?? 0) >= 80).length;
+  const moderateRainCount = DISTRICT_ORDER.filter(d => (districts[d]?.rainfall_7d_mm ?? 0) >= 40).length;
+
   const dmcLabel =
     sourcesStatus.dmc === "ok" && totalWarnings > 0 ? "Warnings active" :
     sourcesStatus.dmc === "ok" && totalWarnings === 0 ? "No warnings" :
@@ -298,6 +301,14 @@ export default function LiveDataPanel() {
 
   return (
     <div style={{ maxWidth: 1280, margin: "0 auto" }}>
+
+      {/* DMC Source Attribution */}
+      <div className="flex items-center gap-2 text-xs text-slate-500 mb-4">
+        <span>📡</span>
+        <span>Weather data from OpenWeatherMap API • Verified against <a href="https://www.dmc.gov.lk" target="_blank" className="text-blue-400 hover:underline ml-1">DMC Sri Lanka</a></span>
+        <span className="ml-auto">Updates every 5 minutes</span>
+      </div>
+
       {/* SECTION A — Status Bar + Progress */}
       <div style={{
         background: "var(--glass)", border: "1px solid var(--glass-border)",
@@ -325,7 +336,7 @@ export default function LiveDataPanel() {
               <SourceDot status={sourcesStatus.owm} />
               {owmLabel}
             </span>
-            <span className="live-countdown" style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><Clock size={11} strokeWidth={2} /> {countdownDisplay}</span>
+            <span className="live-countdown" style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><Clock size={11} strokeWidth={2} /> Last updated: {toSLTime(lastRefresh)} • Next update in {countdownDisplay}</span>
             <button
               onClick={manualRefresh}
               disabled={refreshing}
@@ -355,34 +366,74 @@ export default function LiveDataPanel() {
       </div>
 
       {/* SECTION B — Warning Banner */}
-      {totalWarnings > 0 ? (
-        <div className="warning-banner-active" style={{ marginBottom: 16 }}>
+      {heavyRainCount > 0 ? (
+        <div style={{
+          marginBottom: 16, background: "rgba(239,68,68,0.15)",
+          border: "1px solid rgba(239,68,68,0.4)", borderRadius: 14,
+          padding: "14px 20px", backdropFilter: "blur(24px)",
+        }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <AlertTriangle size={15} strokeWidth={2} style={{ color: "var(--risk-high)" }} />
+            <span style={{ fontSize: 18 }}>🚨</span>
             <span style={{
               fontFamily: "'Space Grotesk',sans-serif", fontSize: 14,
-              fontWeight: 600, color: "#fc8181",
+              fontWeight: 600, color: "#fca5a5",
             }}>
-              ACTIVE FLOOD WARNINGS — {totalWarnings} district{totalWarnings > 1 ? "s" : ""}
+              Heavy rain warning — Flood risk elevated in {heavyRainCount} district{heavyRainCount > 1 ? "s" : ""}
             </span>
             <span style={{
               fontFamily: "'Inter',sans-serif", fontSize: 10,
               color: "var(--text-muted)", marginLeft: "auto",
             }}>
-              Issued by DMC • Updated {formatAge(cacheAge >= 0 ? cacheAge / 60 : undefined)}
+              Rainfall ≥ 80mm detected • Updated {formatAge(cacheAge >= 0 ? cacheAge / 60 : undefined)}
             </span>
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
-            {DISTRICT_ORDER.filter(d => districts[d]?.flood_warning).map(d => (
+            {DISTRICT_ORDER.filter(d => (districts[d]?.rainfall_7d_mm ?? 0) >= 80).map(d => (
               <span key={d} style={{
-                background: "rgba(255,61,0,0.2)", border: "1px solid rgba(255,61,0,0.4)",
+                background: "rgba(239,68,68,0.2)", border: "1px solid rgba(239,68,68,0.4)",
                 borderRadius: 20, padding: "2px 10px", cursor: "pointer",
                 fontFamily: "'Inter',sans-serif", fontSize: 11,
-                fontWeight: 500, color: "#fc8181",
+                fontWeight: 500, color: "#fca5a5",
               }}
                 onClick={() => toggleExpand(d)}
               >
-                <AlertTriangle size={12} strokeWidth={2} /> {d}
+                {districts[d]?.rainfall_7d_mm}mm {d}
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : moderateRainCount > 0 ? (
+        <div style={{
+          marginBottom: 16, background: "rgba(251,191,36,0.12)",
+          border: "1px solid rgba(251,191,36,0.35)", borderRadius: 14,
+          padding: "14px 20px", backdropFilter: "blur(24px)",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 18 }}>⚠️</span>
+            <span style={{
+              fontFamily: "'Space Grotesk',sans-serif", fontSize: 14,
+              fontWeight: 600, color: "#fde68a",
+            }}>
+              Shower warnings active in {moderateRainCount} district{moderateRainCount > 1 ? "s" : ""} — Monitor conditions
+            </span>
+            <span style={{
+              fontFamily: "'Inter',sans-serif", fontSize: 10,
+              color: "var(--text-muted)", marginLeft: "auto",
+            }}>
+              Rainfall ≥ 40mm detected • Updated {formatAge(cacheAge >= 0 ? cacheAge / 60 : undefined)}
+            </span>
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
+            {DISTRICT_ORDER.filter(d => (districts[d]?.rainfall_7d_mm ?? 0) >= 40).map(d => (
+              <span key={d} style={{
+                background: "rgba(251,191,36,0.2)", border: "1px solid rgba(251,191,36,0.4)",
+                borderRadius: 20, padding: "2px 10px", cursor: "pointer",
+                fontFamily: "'Inter',sans-serif", fontSize: 11,
+                fontWeight: 500, color: "#fde68a",
+              }}
+                onClick={() => toggleExpand(d)}
+              >
+                {districts[d]?.rainfall_7d_mm}mm {d}
               </span>
             ))}
           </div>
@@ -390,19 +441,19 @@ export default function LiveDataPanel() {
       ) : isFresh && cacheAge >= 0 ? (
         <div className="warning-banner-clear" style={{ marginBottom: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <Clock size={15} strokeWidth={2} style={{ color: "var(--risk-moderate)" }} />
+            <CheckCircle2 size={15} strokeWidth={2} style={{ color: "var(--risk-low)" }} />
             <span style={{
               fontFamily: "'Space Grotesk',sans-serif", fontSize: 14,
               fontWeight: 600, color: "#86efac",
             }}>
-              No Active Flood Warnings — All districts clear
+              All districts clear — No heavy rainfall detected
             </span>
           </div>
         </div>
       ) : (
         <div className="warning-banner-stale" style={{ marginBottom: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <CheckCircle2 size={15} strokeWidth={2} style={{ color: "var(--risk-low)" }} />
+            <Clock size={15} strokeWidth={2} style={{ color: "var(--risk-moderate)" }} />
             <span style={{
               fontFamily: "'Space Grotesk',sans-serif", fontSize: 14,
               fontWeight: 600, color: "#fcd34d",
@@ -476,10 +527,21 @@ export default function LiveDataPanel() {
                   <span style={{ fontFamily: "'Inter',sans-serif", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-muted)" }}>
                     Rainfall
                   </span>
-                  <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 13, fontWeight: 500, color: getRainfallColor(d?.rainfall_7d_mm ?? null) }}>
-                    {d?.rainfall_7d_mm !== null ? `${d?.rainfall_7d_mm} mm` : "--"}
-                    {d?.rainfall_source === "monsoon_estimate" && (
-                      <span style={{ fontFamily: "'Inter',sans-serif", fontSize: 9, color: "var(--text-muted)", marginLeft: 3 }}>(est.)</span>
+                  <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 13 }}>
+                    {d?.rainfall_7d_mm !== null ? (
+                      <>
+                        <span className={`font-bold ${
+                          d.rainfall_7d_mm >= 80 ? "text-red-400" :
+                          d.rainfall_7d_mm >= 40 ? "text-orange-400" :
+                          d.rainfall_7d_mm >= 20 ? "text-yellow-400" :
+                          "text-green-400"
+                        }`}>
+                          {d.rainfall_7d_mm}
+                        </span>
+                        <span className="text-slate-400 text-xs ml-1">mm (est.)</span>
+                      </>
+                    ) : (
+                      <span style={{ color: "var(--text-muted)" }}>--</span>
                     )}
                   </span>
                 </div>
