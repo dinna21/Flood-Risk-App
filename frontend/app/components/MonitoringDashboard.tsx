@@ -32,6 +32,7 @@ export default function MonitoringDashboard() {
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState("");
+  const ensureUTC = (ts: string) => ts.includes("Z") || ts.includes("+") ? ts : ts + "Z";
   const errCount = useRef(0);
 
   useEffect(() => {
@@ -74,7 +75,7 @@ export default function MonitoringDashboard() {
 
   const timelineData = predictions.slice().reverse().slice(-20).map((p) => ({
     score: parseFloat((p.flood_risk_score * 100).toFixed(1)),
-    time: new Date(p.created_at).toLocaleTimeString("en-US", { timeZone: "Asia/Colombo", hour: "2-digit", minute: "2-digit", hour12: true }),
+    time: new Date(ensureUTC(p.created_at)).toLocaleTimeString("en-US", { timeZone: "Asia/Colombo", hour: "2-digit", minute: "2-digit", hour12: true }),
   }));
 
   const districtData = Object.entries(

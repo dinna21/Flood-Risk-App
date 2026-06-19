@@ -426,6 +426,12 @@ export default function Home() {
   const riskScore = result ? result.flood_risk_score * 100 : 0;
   const riskColor = result ? getRiskColor(result.risk_level) : "var(--accent)";
 
+  /* ── Timezone helper — ensure UTC timestamps parse correctly ── */
+  const slTime = (ts: string, opts?: Intl.DateTimeFormatOptions) =>
+    new Date(ts.includes("Z") || ts.includes("+") ? ts : ts + "Z").toLocaleTimeString(
+      "en-US", { timeZone: "Asia/Colombo", ...opts }
+    );
+
   const historyScoreColor = (level: string) => {
     switch (level) {
       case "Low":       return "var(--risk-low)";
@@ -553,7 +559,7 @@ export default function Home() {
                     </div>
                   </div>
                   <div className="text-slate-500 text-xs">
-                    {new Date(alert.created_at).toLocaleTimeString("en-US", { timeZone: "Asia/Colombo", hour: "2-digit", minute: "2-digit", hour12: true })}
+                    {slTime(alert.created_at, { hour: "2-digit", minute: "2-digit", hour12: true })}
                   </div>
                 </div>
               ))}
@@ -850,7 +856,7 @@ export default function Home() {
                           </div>
                           <div className="result-meta-chip">
                             <Clock size={12} strokeWidth={2} />
-                            <span>{new Date(result.timestamp).toLocaleTimeString("en-US", { timeZone: "Asia/Colombo", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true })}</span>
+                            <span>{slTime(result.timestamp, { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true })}</span>
                           </div>
                           <div className="result-meta-chip">
                             <Waves size={12} strokeWidth={2} />
@@ -963,7 +969,7 @@ export default function Home() {
                           fontFamily: "'Inter',sans-serif", fontSize: 10, color: "var(--text-muted)",
                           width: 50, textAlign: "right", flexShrink: 0,
                         }}>
-                          {new Date(item.created_at).toLocaleTimeString("en-US", { timeZone: "Asia/Colombo", hour: "2-digit", minute: "2-digit", hour12: true })}
+                          {slTime(item.created_at, { hour: "2-digit", minute: "2-digit", hour12: true })}
                         </span>
                       </div>
                     ))}
