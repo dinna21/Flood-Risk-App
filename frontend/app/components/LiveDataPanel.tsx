@@ -302,11 +302,21 @@ export default function LiveDataPanel() {
   return (
     <div style={{ maxWidth: 1280, margin: "0 auto" }}>
 
-      {/* DMC Source Attribution */}
-      <div className="flex items-center gap-2 text-xs text-slate-500 mb-4">
-        <span>📡</span>
-        <span>Weather data from OpenWeatherMap API • Verified against <a href="https://www.dmc.gov.lk" target="_blank" className="text-blue-400 hover:underline ml-1">DMC Sri Lanka</a></span>
-        <span className="ml-auto">Updates every 5 minutes</span>
+      {/* Source Attribution Card */}
+      <div style={{
+        background: "var(--glass)", border: "1px solid var(--glass-border)",
+        borderRadius: 12, padding: "10px 16px", marginBottom: 16,
+        backdropFilter: "blur(24px) saturate(180%)",
+        display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
+      }}>
+        <Radio size={12} strokeWidth={1.75} style={{ color: "var(--accent)", flexShrink: 0 }} />
+        <span style={{ fontFamily: "'Inter',sans-serif", fontSize: 12, color: "var(--text-secondary)", flex: 1 }}>
+          Weather data from OpenWeatherMap API &bull; Verified against{" "}
+          <a href="https://www.dmc.gov.lk" target="_blank" style={{ color: "var(--accent)", textDecoration: "none" }}>DMC Sri Lanka</a>
+        </span>
+        <span style={{ fontFamily: "'Inter',sans-serif", fontSize: 11, color: "var(--text-muted)", whiteSpace: "nowrap" }}>
+          Updates every 5 min
+        </span>
       </div>
 
       {/* SECTION A — Status Bar + Progress */}
@@ -319,13 +329,22 @@ export default function LiveDataPanel() {
           display: "flex", flexWrap: "wrap", justifyContent: "space-between",
           alignItems: "center", gap: 12, paddingBottom: 10,
         }}>
-          <div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <h2 style={{
               fontFamily: "'Space Grotesk',sans-serif", fontSize: 16,
               fontWeight: 600, color: "var(--text-primary)", letterSpacing: "-0.02em",
+              display: "flex", alignItems: "center", gap: 8,
             }}>
-              <Radio size={15} strokeWidth={1.75} style={{ color: "var(--accent)", marginRight: 8, verticalAlign: "middle" }} /> Live Data
+              <Radio size={15} strokeWidth={1.75} style={{ color: "var(--accent)" }} /> Live Weather Data
             </h2>
+            <span style={{
+              background: "rgba(34,197,94,0.15)", border: "1px solid rgba(34,197,94,0.3)",
+              borderRadius: 20, padding: "2px 10px",
+              fontFamily: "'Inter',sans-serif", fontSize: 10, fontWeight: 700,
+              color: "#86efac", textTransform: "uppercase", letterSpacing: "0.08em",
+            }}>
+              LIVE
+            </span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
             <span className="source-pill" title="DMC (Disaster Management Centre) flood warnings scraped from dmc.gov.lk every 60 minutes. When no warnings are posted, this shows 'No warnings posted' — that is correct, not an error.">
@@ -336,7 +355,10 @@ export default function LiveDataPanel() {
               <SourceDot status={sourcesStatus.owm} />
               {owmLabel}
             </span>
-            <span className="live-countdown" style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><Clock size={11} strokeWidth={2} /> Last updated: {toSLTime(lastRefresh)} • Next update in {countdownDisplay}</span>
+            <span className="live-countdown" style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+              <Clock size={11} strokeWidth={2} />
+              Updated: {toSLTime(lastRefresh)} &bull; Next: {countdownDisplay}
+            </span>
             <button
               onClick={manualRefresh}
               disabled={refreshing}
@@ -368,74 +390,80 @@ export default function LiveDataPanel() {
       {/* SECTION B — Warning Banner */}
       {heavyRainCount > 0 ? (
         <div style={{
-          marginBottom: 16, background: "rgba(239,68,68,0.15)",
-          border: "1px solid rgba(239,68,68,0.4)", borderRadius: 14,
-          padding: "14px 20px", backdropFilter: "blur(24px)",
+          marginBottom: 16, background: "rgba(239,68,68,0.12)",
+          border: "1px solid rgba(239,68,68,0.35)", borderRadius: 14,
+          padding: "16px 20px", backdropFilter: "blur(24px)",
         }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <span style={{ fontSize: 18 }}>🚨</span>
-            <span style={{
-              fontFamily: "'Space Grotesk',sans-serif", fontSize: 14,
-              fontWeight: 600, color: "#fca5a5",
-            }}>
-              Heavy rain warning — Flood risk elevated in {heavyRainCount} district{heavyRainCount > 1 ? "s" : ""}
-            </span>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+            <AlertTriangle size={18} strokeWidth={2} style={{ color: "#f87171", marginTop: 1, flexShrink: 0 }} />
+            <div style={{ flex: 1 }}>
+              <div style={{
+                fontFamily: "'Space Grotesk',sans-serif", fontSize: 14,
+                fontWeight: 600, color: "#fca5a5", marginBottom: 8,
+              }}>
+                Heavy rain warning &mdash; Flood risk elevated in {heavyRainCount} district{heavyRainCount > 1 ? "s" : ""}
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {DISTRICT_ORDER.filter(d => (districts[d]?.rainfall_7d_mm ?? 0) >= 80).map(d => (
+                  <span key={d} style={{
+                    background: "rgba(239,68,68,0.18)", border: "1px solid rgba(239,68,68,0.35)",
+                    borderRadius: 20, padding: "3px 12px", cursor: "pointer",
+                    fontFamily: "'Inter',sans-serif", fontSize: 11,
+                    fontWeight: 500, color: "#fca5a5",
+                  }}
+                    onClick={() => toggleExpand(d)}
+                  >
+                    {districts[d]?.rainfall_7d_mm}mm {d}
+                  </span>
+                ))}
+              </div>
+            </div>
             <span style={{
               fontFamily: "'Inter',sans-serif", fontSize: 10,
-              color: "var(--text-muted)", marginLeft: "auto",
+              color: "var(--text-muted)", whiteSpace: "nowrap", flexShrink: 0,
             }}>
-              Rainfall ≥ 80mm detected • Updated {formatAge(cacheAge >= 0 ? cacheAge / 60 : undefined)}
+              Rainfall &ge; 80mm detected<br />
+              Updated {formatAge(cacheAge >= 0 ? cacheAge / 60 : undefined)}
             </span>
-          </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
-            {DISTRICT_ORDER.filter(d => (districts[d]?.rainfall_7d_mm ?? 0) >= 80).map(d => (
-              <span key={d} style={{
-                background: "rgba(239,68,68,0.2)", border: "1px solid rgba(239,68,68,0.4)",
-                borderRadius: 20, padding: "2px 10px", cursor: "pointer",
-                fontFamily: "'Inter',sans-serif", fontSize: 11,
-                fontWeight: 500, color: "#fca5a5",
-              }}
-                onClick={() => toggleExpand(d)}
-              >
-                {districts[d]?.rainfall_7d_mm}mm {d}
-              </span>
-            ))}
           </div>
         </div>
       ) : moderateRainCount > 0 ? (
         <div style={{
-          marginBottom: 16, background: "rgba(251,191,36,0.12)",
-          border: "1px solid rgba(251,191,36,0.35)", borderRadius: 14,
-          padding: "14px 20px", backdropFilter: "blur(24px)",
+          marginBottom: 16, background: "rgba(251,191,36,0.1)",
+          border: "1px solid rgba(251,191,36,0.3)", borderRadius: 14,
+          padding: "16px 20px", backdropFilter: "blur(24px)",
         }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <span style={{ fontSize: 18 }}>⚠️</span>
-            <span style={{
-              fontFamily: "'Space Grotesk',sans-serif", fontSize: 14,
-              fontWeight: 600, color: "#fde68a",
-            }}>
-              Shower warnings active in {moderateRainCount} district{moderateRainCount > 1 ? "s" : ""} — Monitor conditions
-            </span>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+            <AlertTriangle size={18} strokeWidth={2} style={{ color: "#fbbf24", marginTop: 1, flexShrink: 0 }} />
+            <div style={{ flex: 1 }}>
+              <div style={{
+                fontFamily: "'Space Grotesk',sans-serif", fontSize: 14,
+                fontWeight: 600, color: "#fde68a", marginBottom: 8,
+              }}>
+                Shower warnings active in {moderateRainCount} district{moderateRainCount > 1 ? "s" : ""} &mdash; Monitor conditions
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {DISTRICT_ORDER.filter(d => (districts[d]?.rainfall_7d_mm ?? 0) >= 40).map(d => (
+                  <span key={d} style={{
+                    background: "rgba(251,191,36,0.18)", border: "1px solid rgba(251,191,36,0.35)",
+                    borderRadius: 20, padding: "3px 12px", cursor: "pointer",
+                    fontFamily: "'Inter',sans-serif", fontSize: 11,
+                    fontWeight: 500, color: "#fde68a",
+                  }}
+                    onClick={() => toggleExpand(d)}
+                  >
+                    {districts[d]?.rainfall_7d_mm}mm {d}
+                  </span>
+                ))}
+              </div>
+            </div>
             <span style={{
               fontFamily: "'Inter',sans-serif", fontSize: 10,
-              color: "var(--text-muted)", marginLeft: "auto",
+              color: "var(--text-muted)", whiteSpace: "nowrap", flexShrink: 0,
             }}>
-              Rainfall ≥ 40mm detected • Updated {formatAge(cacheAge >= 0 ? cacheAge / 60 : undefined)}
+              Rainfall &ge; 40mm detected<br />
+              Updated {formatAge(cacheAge >= 0 ? cacheAge / 60 : undefined)}
             </span>
-          </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
-            {DISTRICT_ORDER.filter(d => (districts[d]?.rainfall_7d_mm ?? 0) >= 40).map(d => (
-              <span key={d} style={{
-                background: "rgba(251,191,36,0.2)", border: "1px solid rgba(251,191,36,0.4)",
-                borderRadius: 20, padding: "2px 10px", cursor: "pointer",
-                fontFamily: "'Inter',sans-serif", fontSize: 11,
-                fontWeight: 500, color: "#fde68a",
-              }}
-                onClick={() => toggleExpand(d)}
-              >
-                {districts[d]?.rainfall_7d_mm}mm {d}
-              </span>
-            ))}
           </div>
         </div>
       ) : isFresh && cacheAge >= 0 ? (
