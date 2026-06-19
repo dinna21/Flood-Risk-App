@@ -553,7 +553,7 @@ export default function Home() {
                     </div>
                   </div>
                   <div className="text-slate-500 text-xs">
-                    {new Date(alert.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    {new Date(alert.created_at).toLocaleTimeString("en-US", { timeZone: "Asia/Colombo", hour: "2-digit", minute: "2-digit", hour12: true })}
                   </div>
                 </div>
               ))}
@@ -850,7 +850,7 @@ export default function Home() {
                           </div>
                           <div className="result-meta-chip">
                             <Clock size={12} strokeWidth={2} />
-                            <span>{new Date(result.timestamp).toLocaleTimeString()}</span>
+                            <span>{new Date(result.timestamp).toLocaleTimeString("en-US", { timeZone: "Asia/Colombo", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true })}</span>
                           </div>
                           <div className="result-meta-chip">
                             <Waves size={12} strokeWidth={2} />
@@ -963,7 +963,7 @@ export default function Home() {
                           fontFamily: "'Inter',sans-serif", fontSize: 10, color: "var(--text-muted)",
                           width: 50, textAlign: "right", flexShrink: 0,
                         }}>
-                          {new Date(item.created_at).toLocaleTimeString()}
+                          {new Date(item.created_at).toLocaleTimeString("en-US", { timeZone: "Asia/Colombo", hour: "2-digit", minute: "2-digit", hour12: true })}
                         </span>
                       </div>
                     ))}

@@ -46,7 +46,7 @@ export default function MonitoringDashboard() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setPredictions(data.predictions || []);
-      setLastUpdate(new Date().toLocaleTimeString());
+      setLastUpdate(new Date().toLocaleTimeString("en-US", { timeZone: "Asia/Colombo", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true }));
       errCount.current = 0;
     } catch (e) {
       errCount.current++;
@@ -74,7 +74,7 @@ export default function MonitoringDashboard() {
 
   const timelineData = predictions.slice().reverse().slice(-20).map((p) => ({
     score: parseFloat((p.flood_risk_score * 100).toFixed(1)),
-    time: new Date(p.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    time: new Date(p.created_at).toLocaleTimeString("en-US", { timeZone: "Asia/Colombo", hour: "2-digit", minute: "2-digit", hour12: true }),
   }));
 
   const districtData = Object.entries(
