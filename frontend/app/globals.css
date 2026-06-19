@@ -1740,3 +1740,41 @@ input:checked + .toggle-slider::before {
   background: linear-gradient(to top, var(--abyss), transparent);
   pointer-events: none;
 }
+
+/* ─── Tab underline animation ───────────────────────────────────── */
+.tab-item::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 0;
+  height: 2px;
+  background: var(--accent);
+  transition: width 0.25s ease, left 0.25s ease;
+}
+
+.tab-item.active::after {
+  width: 100%;
+  left: 0;
+}
+
+.tab-item.active {
+  border-bottom-color: transparent;
+}
+
+/* ─── Smooth page transitions ───────────────────────────────────── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fadeIn {
+  animation: fadeIn 0.2s ease-out;
+}
+
+/* ─── Mobile responsive final fixes ─────────────────────────────── */
+@media (max-width: 640px) {
+  .tab-label { font-size: 0.7rem; }
+  .stat-card { padding: 0.5rem; }
+  .kpi-value { font-size: 14px; }
+  .tab-item { font-size: 11px; padding: 0 8px; }
+}
