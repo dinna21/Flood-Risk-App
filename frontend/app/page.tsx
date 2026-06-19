@@ -204,6 +204,42 @@ function RiskRing({ score, color }: { score: number; color: string }) {
   );
 }
 
+/* ─── Circular Progress SVG (144px) ──────────────────────────── */
+function CircularProgress({ score, color }: { score: number; color: string }) {
+  const radius = 54;
+  const circumference = 2 * Math.PI * radius;
+  const progress = score * circumference;
+
+  return (
+    <div className="relative w-36 h-36 mx-auto">
+      <svg className="transform -rotate-90 w-36 h-36">
+        <circle
+          cx="72" cy="72" r={radius}
+          stroke="#1e293b" strokeWidth="10"
+          fill="transparent"
+        />
+        <circle
+          cx="72" cy="72" r={radius}
+          stroke={color} strokeWidth="10"
+          fill="transparent"
+          strokeDasharray={circumference}
+          strokeDashoffset={circumference - progress}
+          strokeLinecap="round"
+          style={{ transition: "stroke-dashoffset 1s ease" }}
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-3xl font-bold" style={{ color }}>
+          {(score * 100).toFixed(1)}%
+        </span>
+        <span className="text-xs text-slate-400">
+          risk score
+        </span>
+      </div>
+    </div>
+  );
+}
+
 /* ─── Tab definitions ────────────────────────────────────────────── */
 const TABS = [
   { id: "predict",  label: "Predict",    icon: Crosshair },
@@ -441,7 +477,7 @@ export default function Home() {
       }}>
 
         {/* ════════ HEADER ════════ */}
-        <header className="header-bar polish-header" style={{ flexShrink: 0, gridRow: "unset" }}>
+        <header className="header-bar polish-header py-3" style={{ flexShrink: 0, gridRow: "unset" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <img
               src="/logo-svg.svg"
@@ -496,6 +532,38 @@ export default function Home() {
           </div>
         </header>
 
+        {/* Notification bell panel */}
+        {showNotifPanel && (
+          <>
+            <div style={{ position: "fixed", inset: 0, zIndex: 49 }} onClick={() => setShowNotifPanel(false)} />
+            <div className="absolute right-0 top-12 w-80 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-50 p-4" style={{ right: 16, top: 56 }}>
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="font-bold text-white">Recent Alerts</h3>
+                <button className="text-xs text-slate-400 hover:text-white" onClick={() => { fetchHistory(); fetchStats(); }}>
+                  Clear all
+                </button>
+              </div>
+              {history.filter(a => a.flood_risk_score >= 0.5).slice(0, 10).map(alert => (
+                <div key={alert.id} className="flex items-center gap-3 p-2 hover:bg-slate-700 rounded-lg mb-1">
+                  <span className={`w-2 h-2 rounded-full ${alert.flood_risk_score >= 0.7 ? "bg-red-500" : "bg-orange-500"}`}></span>
+                  <div className="flex-1">
+                    <div className="text-white text-sm font-medium">{alert.district}</div>
+                    <div className="text-slate-400 text-xs">
+                      {(alert.flood_risk_score * 100).toFixed(1)}% -- {alert.risk_level}
+                    </div>
+                  </div>
+                  <div className="text-slate-500 text-xs">
+                    {new Date(alert.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                  </div>
+                </div>
+              ))}
+              {history.filter(a => a.flood_risk_score >= 0.5).length === 0 && (
+                <p className="text-slate-500 text-sm text-center py-4">No recent alerts</p>
+              )}
+            </div>
+          </>
+        )}
+
         {/* ════════ TAB BAR ════════ */}
         <nav className="polish-tabbar" style={{ flexShrink: 0, zIndex: 9 }}>
           {TABS.map((tab) => {
@@ -505,7 +573,7 @@ export default function Home() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`tab-item${active ? " active" : ""}`}
+                className={`tab-item flex-1 hover:bg-slate-700/50${active ? " active" : ""}`}
               >
                 <span style={{ position: "relative", display: "inline-flex" }}>
                   <Icon size={15} strokeWidth={1.75} />
@@ -522,12 +590,15 @@ export default function Home() {
 
           {/* ── PREDICT TAB ── */}
           {activeTab === "predict" && (
-            <div className="predict-outer">
+            <div key={activeTab} className="animate-fadeIn">
+              <div className="predict-outer">
 
               {/* ── LEFT FORM PANEL (unchanged content, new wrapper) ── */}
-              <div className="predict-form-panel">
-               <div className="glass-panel form-panel" style={{ height: "fit-content" }}>
-                <div className="form-content">
+              <div className="predict-form-panel" style={{ overflow: "visible" }}>
+                <div className="relative" style={{ height: "100%" }}>
+                  <div className="overflow-y-auto" style={{ maxHeight: "calc(100vh - 220px)", paddingBottom: "6rem" }}>
+                    <div className="glass-panel form-panel" style={{ height: "fit-content" }}>
+                      <div className="form-content">
 
                   {/* GROUP 1 — LOCATION */}
                   <div className="form-section-header"><span>Location</span><div className="section-rule" /></div>
@@ -719,24 +790,30 @@ export default function Home() {
                     </div>
                   </div>
                 </div>
-
-                <div className="sticky-btn-row">
-                  <div className="live-feed-indicator" style={{ marginBottom: 6 }}>
-                    <span className="live-feed-dot" />
-                    <span>Live data active</span>
+                    </div>
                   </div>
-
-                <button
-                  id="predict-btn"
-                  onClick={handleSubmit}
-                  disabled={loading}
-                  className={`predict-btn${loading ? " loading" : ""}`}
-                >
-                  {loading ? "Analyzing Risk..." : "Predict Flood Risk"}
-                  {loading ? <RefreshCw size={14} strokeWidth={1.75} style={{ animation: "spin 0.9s linear infinite" }} /> : <ArrowRight size={14} strokeWidth={1.75} />}
-                </button>
-                {error && <div className="error-msg" role="alert">{error}</div>}
-                </div>
+                  <div className="sticky bottom-0 bg-slate-900 pt-3 pb-4 border-t border-slate-700" style={{ zIndex: 2 }}>
+                    <div className="live-feed-indicator" style={{ marginBottom: 6 }}>
+                      <span className="live-feed-dot" />
+                      <span>Live data active</span>
+                    </div>
+                    <button
+                      onClick={handleSubmit}
+                      disabled={loading}
+                      className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-900 text-white font-bold py-4 rounded-xl transition-all text-lg shadow-lg shadow-blue-900/50"
+                    >
+                      {loading ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                          </svg>
+                          Analyzing...
+                        </span>
+                      ) : "Predict Flood Risk"}
+                    </button>
+                    {error && <div className="error-msg" role="alert">{error}</div>}
+                  </div>
                 </div>
               </div>
 
@@ -748,7 +825,7 @@ export default function Home() {
 
                   {/* Left: SVG Ring (88px) */}
                   {result && !loading ? (
-                    <RiskRing score={riskScore} color={riskColor} />
+                    <CircularProgress score={result.flood_risk_score} color={result.risk_color} />
                   ) : (
                     <div className="ring-placeholder" />
                   )}
@@ -858,7 +935,8 @@ export default function Home() {
                       No predictions recorded yet
                     </div>
                   ) : (
-                    history.slice(0, 10).map((item) => (
+                    <div className="overflow-x-auto -mx-2 px-2">
+                      {history.slice(0, 10).map((item) => (
                       <div className="pred-row" key={item.id}>
                         <span style={{
                           flex: 1, fontFamily: "'Inter',sans-serif", fontWeight: 500, fontSize: 12,
@@ -883,32 +961,38 @@ export default function Home() {
                           {new Date(item.created_at).toLocaleTimeString()}
                         </span>
                       </div>
-                    ))
+                    ))}
+                    </div>
                   )}
                 </div>
               </div>
             </div>
+          </div>
           )}
 
           {/* ── MAP TAB ── */}
           {activeTab === "map" && (
-            <div style={{ maxWidth: 1280, margin: "0 auto" }}>
-              <FloodRiskMap />
+            <div key={activeTab} className="animate-fadeIn">
+              <div style={{ maxWidth: 1280, margin: "0 auto" }}>
+                <FloodRiskMap />
+              </div>
             </div>
           )}
 
           {/* ── MONITORING TAB ── */}
           {activeTab === "monitor" && (
-            <div style={{ maxWidth: 1280, margin: "0 auto" }}>
-              <MonitoringDashboard />
+            <div key={activeTab} className="animate-fadeIn">
+              <div style={{ maxWidth: 1280, margin: "0 auto" }}>
+                <MonitoringDashboard />
+              </div>
             </div>
           )}
 
           {/* ── PIPELINE TAB ── */}
-          {activeTab === "pipeline" && <PipelineStatus />}
+          {activeTab === "pipeline" && <div key={activeTab} className="animate-fadeIn"><PipelineStatus /></div>}
 
           {/* ── LIVE DATA TAB ── */}
-          {activeTab === "live" && <LiveDataPanel />}
+          {activeTab === "live" && <div key={activeTab} className="animate-fadeIn"><LiveDataPanel /></div>}
 
         </main>
 
