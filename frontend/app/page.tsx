@@ -583,7 +583,6 @@ export default function Home() {
               >
                 <span style={{ position: "relative", display: "inline-flex" }}>
                   <Icon size={15} strokeWidth={1.75} />
-                  {tab.id === "live" && <span className="tab-live-dot" />}
                 </span>
                 <span>{tab.label}</span>
               </button>
