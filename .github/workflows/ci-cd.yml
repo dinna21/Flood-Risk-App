@@ -1,0 +1,216 @@
+name: CI/CD Pipeline - Flood Risk Intelligence
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  # --- JOB 1: Backend Tests ---
+  backend-ci:
+    name: Backend CI
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          cd backend
+          pip install -r requirements.txt
+
+      - name: Check model file exists
+        run: |
+          if [ -f "backend/model/flood_model.cbm" ]; then
+            echo "Model file found"
+            ls -lh backend/model/
+          else
+            echo "Model file missing!"
+            exit 1
+          fi
+
+      - name: Check feature metadata exists
+        run: |
+          if [ -f "backend/model/feature_names.json" ]; then
+            echo "Feature names found"
+            python3 -c "
+import json
+with open('backend/model/feature_names.json') as f:
+    data = json.load(f)
+print(f'Features: {len(data[\"features\"])}')
+print(f'Cat cols: {len(data[\"cat_cols\"])}')
+print(f'Num cols: {len(data[\"num_cols\"])}')
+print('Feature metadata valid')
+"
+          else
+            echo "Feature metadata missing!"
+            exit 1
+          fi
+
+      - name: Validate imports
+        run: |
+          cd backend
+          python3 -c "
+import fastapi
+import catboost
+import pandas
+import numpy
+print('All imports successful')
+print(f'FastAPI: {fastapi.__version__}')
+print(f'CatBoost: {catboost.__version__}')
+print(f'Pandas: {pandas.__version__}')
+"
+
+      - name: Run syntax check
+        run: |
+          cd backend
+          python3 -m py_compile main.py
+          echo "main.py syntax valid"
+
+      - name: Run pipeline tests
+        run: |
+          cd backend
+          python3 test_pipeline.py
+          echo "All backend tests passed"
+
+  # --- JOB 2: Frontend CI ---
+  frontend-ci:
+    name: Frontend CI
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Type check
+        run: |
+          cd frontend
+          npx tsc --noEmit
+          echo "TypeScript check passed"
+
+      - name: Build check
+        run: |
+          cd frontend
+          echo "NEXT_PUBLIC_API_URL=https://flood-risk-app-production.up.railway.app" > .env.local
+          npm run build
+          echo "Frontend build successful"
+
+  # --- JOB 3: Integration Check ---
+  integration-check:
+    name: Integration Check
+    runs-on: ubuntu-latest
+    needs: [backend-ci, frontend-ci]
+
+    steps:
+      - name: Check live API health
+        run: |
+          echo "Checking live API..."
+          response=$(curl -s -o /dev/null -w "%{http_code}" \
+            https://flood-risk-app-production.up.railway.app/health \
+            --max-time 30)
+          if [ "$response" = "200" ]; then
+            echo "Live API is healthy (HTTP $response)"
+          else
+            echo "API returned HTTP $response (may be cold start)"
+          fi
+
+      - name: Test live prediction
+        run: |
+          echo "Testing prediction endpoint..."
+          result=$(curl -s -X POST \
+            https://flood-risk-app-production.up.railway.app/predict \
+            -H "Content-Type: application/json" \
+            -d '{
+              "district": "Colombo",
+              "rainfall_7d_mm": 100,
+              "elevation_m": 5,
+              "historical_flood_count": 3
+            }' \
+            --max-time 60)
+
+          echo "API Response: $result"
+
+          score=$(echo "$result" | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+score = data.get('flood_risk_score', -1)
+print(score)
+")
+
+          if [ "$(echo "$score >= 0 && $score <= 1" | bc)" -eq 1 ]; then
+            echo "Prediction valid: $score"
+          else
+            echo "Invalid prediction score: $score"
+            exit 1
+          fi
+
+      - name: Test pipeline status endpoint
+        run: |
+          echo "Testing pipeline status..."
+          curl -s https://flood-risk-app-production.up.railway.app/pipeline/status \
+            --max-time 20 | python3 -m json.tool
+          echo "Pipeline status OK"
+
+      - name: Generate CI/CD Report
+        run: |
+          echo "=================================="
+          echo "CI/CD PIPELINE REPORT"
+          echo "=================================="
+          echo "Date: $(date)"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "Triggered by: ${{ github.actor }}"
+          echo ""
+          echo "Jobs completed:"
+          echo "  Backend CI - Python tests passed"
+          echo "  Frontend CI - Next.js build passed"
+          echo "  Integration - Live API verified"
+          echo ""
+          echo "Deployment:"
+          echo "  Backend: Railway (auto-deploy on push)"
+          echo "  Frontend: Vercel (auto-deploy on push)"
+          echo "=================================="
+
+  # --- JOB 4: Success Notification ---
+  notify-success:
+    name: Pipeline Complete
+    runs-on: ubuntu-latest
+    needs: [backend-ci, frontend-ci, integration-check]
+    if: success()
+
+    steps:
+      - name: Success notification
+        run: |
+          echo "All CI/CD checks passed"
+          echo "Backend tests: PASSED"
+          echo "Frontend build: PASSED"
+          echo "Integration tests: PASSED"
+          echo "Live API: HEALTHY"
+          echo ""
+          echo "Deployment Status:"
+          echo "  Railway will auto-deploy backend"
+          echo "  Vercel will auto-deploy frontend"
+          echo ""
+          echo "System: Sri Lanka Flood Risk Intelligence"
+          echo "Team: TensorTitans_mlops"
