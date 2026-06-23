@@ -42,15 +42,7 @@ jobs:
         run: |
           if [ -f "backend/model/feature_names.json" ]; then
             echo "Feature names found"
-            python3 -c "
-import json
-with open('backend/model/feature_names.json') as f:
-    data = json.load(f)
-print(f'Features: {len(data[\"features\"])}')
-print(f'Cat cols: {len(data[\"cat_cols\"])}')
-print(f'Num cols: {len(data[\"num_cols\"])}')
-print('Feature metadata valid')
-"
+            python3 -c "import json; f=open('backend/model/feature_names.json'); data=json.load(f); print(f'Features: {len(data[\"features\"])}'); print(f'Cat cols: {len(data[\"cat_cols\"])}'); print(f'Num cols: {len(data[\"num_cols\"])}'); print('Feature metadata valid')"
           else
             echo "Feature metadata missing!"
             exit 1
@@ -59,16 +51,7 @@ print('Feature metadata valid')
       - name: Validate imports
         run: |
           cd backend
-          python3 -c "
-import fastapi
-import catboost
-import pandas
-import numpy
-print('All imports successful')
-print(f'FastAPI: {fastapi.__version__}')
-print(f'CatBoost: {catboost.__version__}')
-print(f'Pandas: {pandas.__version__}')
-"
+          python3 -c "import fastapi,catboost,pandas,numpy; print('All imports successful'); print(f'FastAPI: {fastapi.__version__}'); print(f'CatBoost: {catboost.__version__}'); print(f'Pandas: {pandas.__version__}')"
 
       - name: Run syntax check
         run: |
@@ -151,12 +134,7 @@ print(f'Pandas: {pandas.__version__}')
 
           echo "API Response: $result"
 
-          score=$(echo "$result" | python3 -c "
-import json, sys
-data = json.load(sys.stdin)
-score = data.get('flood_risk_score', -1)
-print(score)
-")
+          score=$(echo "$result" | python3 -c "import json,sys; data=json.load(sys.stdin); print(data.get('flood_risk_score',-1))")
 
           if [ "$(echo "$score >= 0 && $score <= 1" | bc)" -eq 1 ]; then
             echo "Prediction valid: $score"
