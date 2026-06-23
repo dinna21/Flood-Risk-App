@@ -315,6 +315,9 @@ export default function Home() {
     is_good_to_live: "Yes",
   });
 
+  const formRef = useRef(form);
+  useEffect(() => { formRef.current = form; }, [form]);
+
   const [result, setResult]   = useState<PredictionResult | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [stats, setStats]     = useState<Stats | null>(null);
@@ -332,13 +335,25 @@ export default function Home() {
 
   useEffect(() => {
     const handler = (e: Event) => {
-      const { district } = (e as CustomEvent).detail;
+      const detail = (e as CustomEvent).detail as {
+        district: string;
+        useLiveData?: boolean;
+        liveOverrides?: {
+          rainfall_7d_mm: number | null;
+          flood_occurrence_current_event: "Yes" | "No";
+          temperature_c: number | null;
+          humidity_pct: number | null;
+        };
+        autoPredict?: boolean;
+      };
+
       setActiveTab("predict");
-      const defaults = DISTRICT_DEFAULTS[district];
+
+      const defaults = DISTRICT_DEFAULTS[detail.district];
       if (defaults) {
         setForm((prev) => ({
           ...prev,
-          district,
+          district: detail.district,
           elevation_m: defaults.elevation,
           rainfall_7d_mm: defaults.rainfall,
           monthly_rainfall_mm: defaults.monthly,
@@ -349,7 +364,34 @@ export default function Home() {
           water_presence_flag: defaults.waterPresence,
         }));
       }
+
+      setTimeout(() => {
+        if (detail.liveOverrides) {
+          setForm((prev) => {
+            const updated = { ...prev };
+            if (detail.liveOverrides!.rainfall_7d_mm !== null) {
+              updated.rainfall_7d_mm = Math.round(detail.liveOverrides!.rainfall_7d_mm!);
+              updated.monthly_rainfall_mm = Math.min(
+                Math.round(detail.liveOverrides!.rainfall_7d_mm! * (30 / 7)),
+                800
+              );
+            }
+            if (detail.liveOverrides!.flood_occurrence_current_event) {
+              updated.flood_occurrence_current_event =
+                detail.liveOverrides!.flood_occurrence_current_event;
+            }
+            return updated;
+          });
+        }
+
+        if (detail.autoPredict) {
+          setTimeout(() => {
+            handleSubmit();
+          }, 100);
+        }
+      }, 0);
     };
+
     window.addEventListener("selectDistrict", handler);
     return () => window.removeEventListener("selectDistrict", handler);
   }, []);
@@ -372,6 +414,7 @@ export default function Home() {
   };
 
   const handleSubmit = async () => {
+    const currentForm = formRef.current;
     setLoading(true);
     setError("");
     setResult(null);
@@ -379,12 +422,12 @@ export default function Home() {
       const res = await fetch(`${API_URL}/predict`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, use_live_data: true }),
+        body: JSON.stringify({ ...currentForm, use_live_data: true }),
       });
       if (!res.ok) throw new Error("Prediction failed");
       const data = await res.json();
       setResult(data);
-      setExplanation(generateExplanation(form, data.flood_risk_score, data.risk_level));
+      setExplanation(generateExplanation(currentForm, data.flood_risk_score, data.risk_level));
       fetchHistory();
       fetchStats();
     } catch (e) {

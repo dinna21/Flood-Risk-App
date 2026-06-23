@@ -12,6 +12,18 @@ import {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+interface SelectDistrictDetail {
+  district: string;
+  useLiveData: boolean;
+  liveOverrides?: {
+    rainfall_7d_mm: number | null;
+    flood_occurrence_current_event: "Yes" | "No";
+    temperature_c: number | null;
+    humidity_pct: number | null;
+  };
+  autoPredict?: boolean;
+}
+
 interface DistrictLiveData {
   flood_warning: boolean;
   rainfall_7d_mm: number | null;
@@ -648,8 +660,20 @@ export default function LiveDataPanel() {
                     style={{ marginTop: 12 }}
                     onClick={(e) => {
                       e.stopPropagation();
+                      const districtData = liveData?.districts?.[district];
                       window.dispatchEvent(new CustomEvent("selectDistrict", {
-                        detail: { district, useLiveData: true },
+                        detail: {
+                          district,
+                          useLiveData: true,
+                          liveOverrides: {
+                            rainfall_7d_mm: districtData?.rainfall_7d_mm ?? null,
+                            flood_occurrence_current_event:
+                              districtData?.flood_warning === true ? "Yes" as const : "No" as const,
+                            temperature_c: districtData?.temperature_c ?? null,
+                            humidity_pct: districtData?.humidity_pct ?? null,
+                          },
+                          autoPredict: true,
+                        } as SelectDistrictDetail,
                       }));
                     }}
                   >
